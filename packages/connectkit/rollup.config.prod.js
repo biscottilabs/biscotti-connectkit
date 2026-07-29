@@ -6,7 +6,14 @@ import packageJson from './package.json';
 export default [
   {
     input: ['./src/index.ts'],
-    external: ['react', 'react-dom', 'framer-motion', 'wagmi'],
+    external: [
+      '@wagmi/connectors',
+      '@wagmi/core',
+      'react',
+      'react-dom',
+      'framer-motion',
+      'wagmi',
+    ],
     output: {
       file: packageJson.exports.import,
       format: 'esm',

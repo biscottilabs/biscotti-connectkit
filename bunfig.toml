@@ -1,5 +1,0 @@
-[install]
-# Preserve the flat node_modules layout used by this legacy Yarn workspace.
-# Bun's isolated linker can be reconsidered after workspace dependencies are
-# audited for undeclared/phantom imports.
-linker = "hoisted"

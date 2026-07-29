@@ -1,18 +1,20 @@
-import { FunctionComponent, ComponentProps } from 'react';
-import { SIWEProvider } from 'connectkit';
 import type { IncomingMessage, ServerResponse } from 'http';
-import { getIronSession, IronSession, IronSessionOptions } from 'iron-session';
-import { NextApiHandler, NextApiRequest, NextApiResponse } from 'next';
-
-import { Chain, Transport, PublicClient, createPublicClient, http } from 'viem';
+import { getIronSession } from 'iron-session';
+import type { IronSession, IronSessionOptions } from 'iron-session';
+import type { NextApiHandler, NextApiRequest, NextApiResponse } from 'next';
+import { createPublicClient, http } from 'viem';
+import type { Chain, PublicClient, Transport } from 'viem';
 import * as allChains from 'viem/chains';
-import {
-  generateSiweNonce,
-  createSiweMessage,
-  parseSiweMessage,
-} from 'viem/siwe';
+import { generateSiweNonce, parseSiweMessage } from 'viem/siwe';
 
-type RouteHandlerOptions = {
+export type NextSIWESession<TSessionData extends Object = {}> = IronSession &
+  TSessionData & {
+    nonce?: string;
+    address?: string;
+    chainId?: number;
+  };
+
+export type RouteHandlerOptions = {
   afterNonce?: (
     req: NextApiRequest,
     res: NextApiResponse,
@@ -31,7 +33,7 @@ type RouteHandlerOptions = {
   afterLogout?: (req: NextApiRequest, res: NextApiResponse) => Promise<void>;
 };
 
-type NextServerSIWEConfig = {
+export type NextServerSIWEConfig = {
   config?: {
     chains: readonly [Chain, ...Chain[]];
     transports?: Record<number, Transport>;
@@ -40,32 +42,7 @@ type NextServerSIWEConfig = {
   options?: RouteHandlerOptions;
 };
 
-type NextClientSIWEConfig = {
-  apiRoutePrefix: string;
-  statement?: string;
-};
-
-type NextSIWESession<TSessionData extends Object = {}> = IronSession &
-  TSessionData & {
-    nonce?: string;
-    address?: string;
-    chainId?: number;
-  };
-
-type NextSIWEProviderProps = Omit<
-  ComponentProps<typeof SIWEProvider>,
-  | 'getNonce'
-  | 'createMessage'
-  | 'verifyMessage'
-  | 'getSession'
-  | 'signOut'
-  | 'data'
-  | 'signIn'
-  | 'status'
-  | 'resetStatus'
->;
-
-type ConfigureServerSIWEResult<TSessionData extends Object = {}> = {
+export type ConfigureServerSIWEResult<TSessionData extends Object = {}> = {
   apiRouteHandler: NextApiHandler;
   getSession: (
     req: IncomingMessage,
@@ -73,21 +50,16 @@ type ConfigureServerSIWEResult<TSessionData extends Object = {}> = {
   ) => Promise<NextSIWESession<TSessionData>>;
 };
 
-type ConfigureClientSIWEResult<TSessionData extends Object = {}> = {
-  Provider: FunctionComponent<NextSIWEProviderProps>;
-};
-
 const getSession = async <TSessionData extends Object = {}>(
   req: IncomingMessage,
-  res: any, // ServerResponse<IncomingMessage>,
+  res: ServerResponse,
   sessionConfig: IronSessionOptions
 ) => {
-  const session = (await getIronSession(
+  return (await getIronSession(
     req,
     res,
     sessionConfig
   )) as NextSIWESession<TSessionData>;
-  return session;
 };
 
 const logoutRoute = async (
@@ -97,7 +69,7 @@ const logoutRoute = async (
   afterCallback?: RouteHandlerOptions['afterLogout']
 ) => {
   switch (req.method) {
-    case 'GET':
+    case 'GET': {
       const session = await getSession(req, res, sessionConfig);
       session.destroy();
       if (afterCallback) {
@@ -105,6 +77,7 @@ const logoutRoute = async (
       }
       res.status(200).end();
       break;
+    }
     default:
       res.setHeader('Allow', ['GET']);
       res.status(405).end(`Method ${req.method} Not Allowed`);
@@ -118,7 +91,7 @@ const nonceRoute = async (
   afterCallback?: RouteHandlerOptions['afterNonce']
 ) => {
   switch (req.method) {
-    case 'GET':
+    case 'GET': {
       const session = await getSession(req, res, sessionConfig);
       if (!session.nonce) {
         session.nonce = generateSiweNonce();
@@ -129,6 +102,7 @@ const nonceRoute = async (
       }
       res.send(session.nonce);
       break;
+    }
     default:
       res.setHeader('Allow', ['GET']);
       res.status(405).end(`Method ${req.method} Not Allowed`);
@@ -142,7 +116,7 @@ const sessionRoute = async (
   afterCallback?: RouteHandlerOptions['afterSession']
 ) => {
   switch (req.method) {
-    case 'GET':
+    case 'GET': {
       const session = await getSession(req, res, sessionConfig);
       if (afterCallback) {
         await afterCallback(req, res, session);
@@ -150,6 +124,7 @@ const sessionRoute = async (
       const { address, chainId } = session;
       res.send({ address, chainId });
       break;
+    }
     default:
       res.setHeader('Allow', ['GET']);
       res.status(405).end(`Method ${req.method} Not Allowed`);
@@ -181,7 +156,6 @@ const verifyRoute = async (
           ? Object.values(config.chains).find((c) => c.id === parsed.chainId)
           : undefined;
         if (!chain) {
-          // Try to find chain from allChains if not found in user-provided chains
           chain = Object.values(allChains).find((c) => c.id === parsed.chainId);
         }
         if (!chain) {
@@ -232,7 +206,7 @@ export const configureServerSideSIWE = <TSessionData extends Object = {}>({
   session: { cookieName, password, cookieOptions, ...otherSessionOptions } = {},
   options: { afterNonce, afterVerify, afterSession, afterLogout } = {},
 }: NextServerSIWEConfig): ConfigureServerSIWEResult<TSessionData> => {
-  const sessionConfig: IronSessionOptions = {
+  const getSessionConfig = (): IronSessionOptions => ({
     cookieName: cookieName ?? 'connectkit-next-siwe',
     password: password ?? envVar('SESSION_SECRET'),
     cookieOptions: {
@@ -240,7 +214,7 @@ export const configureServerSideSIWE = <TSessionData extends Object = {}>({
       ...(cookieOptions ?? {}),
     },
     ...otherSessionOptions,
-  };
+  });
 
   const apiRouteHandler: NextApiHandler = async (req, res) => {
     if (!(req.query.route instanceof Array)) {
@@ -250,6 +224,7 @@ export const configureServerSideSIWE = <TSessionData extends Object = {}>({
     }
 
     const route = req.query.route.join('/');
+    const sessionConfig = getSessionConfig();
     switch (route) {
       case 'nonce':
         return await nonceRoute(req, res, sessionConfig, afterNonce);
@@ -267,60 +242,6 @@ export const configureServerSideSIWE = <TSessionData extends Object = {}>({
   return {
     apiRouteHandler,
     getSession: async (req: IncomingMessage, res: ServerResponse) =>
-      await getSession<TSessionData>(req, res, sessionConfig),
-  };
-};
-
-export const configureClientSIWE = <TSessionData extends Object = {}>({
-  apiRoutePrefix,
-  statement = 'Sign In With Ethereum.',
-}: NextClientSIWEConfig): ConfigureClientSIWEResult<TSessionData> => {
-  const NextSIWEProvider = (props: NextSIWEProviderProps) => {
-    return (
-      <SIWEProvider
-        getNonce={async () => {
-          const res = await fetch(`${apiRoutePrefix}/nonce`);
-          if (!res.ok) {
-            throw new Error('Failed to fetch SIWE nonce');
-          }
-          const nonce = await res.text();
-          return nonce;
-        }}
-        createMessage={({ nonce, address, chainId }) =>
-          createSiweMessage({
-            version: '1',
-            domain: window.location.host,
-            uri: window.location.origin,
-            address,
-            chainId,
-            nonce,
-            statement,
-          })
-        }
-        verifyMessage={({ message, signature }) =>
-          fetch(`${apiRoutePrefix}/verify`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ message, signature }),
-          }).then((res) => res.ok)
-        }
-        getSession={async () => {
-          const res = await fetch(`${apiRoutePrefix}/session`);
-          if (!res.ok) {
-            throw new Error('Failed to fetch SIWE session');
-          }
-          const { address, chainId } = await res.json();
-          return address && chainId ? { address, chainId } : null;
-        }}
-        signOut={() => fetch(`${apiRoutePrefix}/logout`).then((res) => res.ok)}
-        {...props}
-      />
-    );
-  };
-
-  return {
-    Provider: NextSIWEProvider,
+      await getSession<TSessionData>(req, res, getSessionConfig()),
   };
 };

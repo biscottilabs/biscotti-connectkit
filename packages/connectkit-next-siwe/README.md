@@ -6,11 +6,26 @@
 
 Once you've <a href={routes.ConnectKit.GettingStarted}>set up ConnectKit</a>, install the official [Sign In With Ethereum package](https://www.npmjs.com/package/siwe) and our SIWE helper package to your Next.js project.
 
-```
-yarn add siwe connectkit-next-siwe
+```sh
+bun add siwe connectkit-next-siwe
 ```
 
 ## 2. Configure
+
+Import browser-safe configuration from the client entry point:
+
+```ts
+import { configureClientSIWE } from 'connectkit-next-siwe/client';
+```
+
+Import API-route and session configuration only from the server entry point:
+
+```ts
+import { configureServerSideSIWE } from 'connectkit-next-siwe/server';
+```
+
+Keeping these entry points separate prevents `iron-session` and Node.js built-ins from entering
+the browser bundle.
 
 You can find the full configuration documentation for this package in the docs [here](https://docs.family.co/connectkit/auth-with-nextjs).
 

@@ -14,7 +14,7 @@ jobs:
           bun-version: 1.3.14
 
       - name: Install deps
-        run: bun ci
+        run: bun install --frozen-lockfile
 
       - name: Build the code
         run: bun run build:ci
