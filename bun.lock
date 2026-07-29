@@ -153,7 +153,6 @@
       "name": "connectkit",
       "version": "1.9.2",
       "dependencies": {
-        "@aave/account": "^0.2.0",
         "buffer": "^6.0.3",
         "detect-browser": "^5.3.0",
         "framer-motion": "^6.3.11",
@@ -235,8 +234,6 @@
     "ws": "8.17.1",
   },
   "packages": {
-    "@aave/account": ["@aave/account@0.2.0", "", { "peerDependencies": { "react": "17.x || 18.x || 19.x", "react-dom": "17.x || 18.x || 19.x", "viem": "2.x", "wagmi": "2.x" }, "optionalPeers": ["react", "react-dom", "viem", "wagmi"] }, "sha512-fk9KcC0He0WNvUGytxVv4urh8F+zznm6ZdpgKnNvq9jKUpnc2HSSn7mS3n4h13h80WtF8OL6rpL50ctqqc4/Nw=="],
-
     "@adraffy/ens-normalize": ["@adraffy/ens-normalize@1.11.1", "", {}, "sha512-nhCBV3quEgesuf7c7KYfperqSS14T8bYuvJ8PcLJp6znkZpFc0AuW4qBtr8eKVyPPe/8RSr7sglCWPU5eaxwKQ=="],
 
     "@alloc/quick-lru": ["@alloc/quick-lru@5.2.0", "", {}, "sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw=="],

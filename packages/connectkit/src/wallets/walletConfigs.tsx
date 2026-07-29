@@ -50,13 +50,6 @@ export const walletConfigs: {
   mock: {
     icon: <Logos.Mock />,
   },
-  aaveAccountProvider: {
-    name: 'Aave Account',
-    shortName: 'Aave',
-    icon: <Logos.AaveAccount />,
-    iconConnector: <Logos.AaveAccount />,
-    iconShape: 'squircle',
-  },
   argent: {
     name: 'Argent',
     icon: <Logos.Argent />,

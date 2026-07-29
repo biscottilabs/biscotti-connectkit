@@ -1,6 +1,4 @@
 const enUS = {
-  // Aave Account
-  continueWithAave: 'Continue with Aave',
   orSelectWallet: 'or select a wallet from the list below',
   loginWithEmailOrPhone: 'Login with Email or Phone',
   // ConnectKit

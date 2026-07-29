@@ -21,36 +21,20 @@ import useLocales from '../../../hooks/useLocales';
 import ConnectorList from '../../Common/ConnectorList';
 import useIsMobile from '../../../hooks/useIsMobile';
 import Button from '../../Common/Button';
-import { useAaveAccountConnector } from '../../../hooks/useConnectors';
-import { OrDivider } from '../../Common/Modal';
-import { ContinueWithAaveButton } from '../../Common/ContinueWithAaveButton';
 
 const Wallets: React.FC = () => {
   const context = useContext();
   const locales = useLocales({});
 
   const isMobile = useIsMobile();
-  const aaveAccountConnector = useAaveAccountConnector();
 
   return (
     <PageContent
       style={{
         width: 312,
-        paddingTop: aaveAccountConnector ? 32 : undefined,
       }}
     >
       <Container>
-        {aaveAccountConnector && (
-          <>
-            <ContinueWithAaveButton
-              onClick={() => {
-                context.setConnector(aaveAccountConnector);
-                context.setRoute(routes.CONNECT);
-              }}
-            />
-            <OrDivider hideHr>{locales.orSelectWallet}</OrDivider>
-          </>
-        )}
         <div>
           <ConnectorList />
           {isMobile ? (

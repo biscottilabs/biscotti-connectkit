@@ -3,10 +3,7 @@ import { routes, useContext } from '../ConnectKit';
 
 import { useWalletConnectModal } from '../../hooks/useWalletConnectModal';
 
-import {
-  isAaveAccountConnector,
-  isWalletConnectConnector,
-} from '../../utils';
+import { isWalletConnectConnector } from '../../utils';
 
 import { PageContent, ModalContent } from '../Common/Modal/styles';
 import { OrDivider } from '../Common/Modal';
@@ -23,7 +20,7 @@ import { useWeb3 } from '../contexts/web3';
 
 const ConnectWithQRCode: React.FC<{
   switchConnectMethod: (id?: string) => void;
-}> = ({ switchConnectMethod }) => {
+}> = () => {
   const context = useContext();
 
   const id = context.connector.id;
@@ -110,14 +107,6 @@ const ConnectWithQRCode: React.FC<{
         </div>
       )}
 
-      {isAaveAccountConnector(wallet.id) && (
-        <>
-          <OrDivider />
-          <Button onClick={() => switchConnectMethod(id)}>
-            {locales.loginWithEmailOrPhone}
-          </Button>
-        </>
-      )}
       {/*
       {hasExtensionInstalled && ( // Run the extension
         <Button

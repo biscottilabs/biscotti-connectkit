@@ -23,7 +23,6 @@ import {
 } from '../../../utils';
 import { useLastConnector } from '../../../hooks/useLastConnector';
 import { useConnect } from '../../../hooks/useConnect';
-import { useAaveAccountConnector } from '../../../hooks/useConnectors';
 
 const ConnectorList = () => {
   const context = useContext();
@@ -31,11 +30,8 @@ const ConnectorList = () => {
 
   const wallets = useWallets();
   const { lastConnectorId } = useLastConnector();
-  const aaveAccountConnector = useAaveAccountConnector();
 
-  const filteredWallets = wallets.filter(
-    (wallet) => wallet.id !== aaveAccountConnector?.id
-  );
+  const filteredWallets = wallets;
 
   const walletsToDisplay =
     context.options?.hideRecentBadge || lastConnectorId === 'walletConnect' // do not hoist walletconnect to top of list

@@ -80,9 +80,6 @@ function flattenChildren(children: React.ReactNode): ReactChildArray {
 export const isWalletConnectConnector = (connectorId?: string) =>
   connectorId === 'walletConnect';
 
-export const isAaveAccountConnector = (connectorId?: string) =>
-  connectorId === 'aaveAccountProvider';
-
 export const isMetaMaskConnector = (connectorId?: string) =>
   connectorId === 'metaMaskSDK';
 

@@ -3,6 +3,15 @@ import react from '@vitejs/plugin-react'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  // Dependency pre-bundling does not inherit `build.target`. Vite's default
+  // includes Safari 13, which predates BigInt literals, so esbuild refuses to
+  // pre-bundle viem's `123n` literals and `vite dev` fails while `vite build`
+  // succeeds. Pin the same target here so dev and build agree.
+  optimizeDeps: {
+    esbuildOptions: {
+      target: 'es2020'
+    }
+  },
   build: {
     target: 'es2020',
     rollupOptions: {

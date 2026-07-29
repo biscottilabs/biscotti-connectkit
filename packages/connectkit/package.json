@@ -35,13 +35,10 @@
     "react-hook",
     "blockchain",
     "hooks",
-    "family",
-    "aave",
     "ethereum",
     "react"
   ],
   "dependencies": {
-    "@aave/account": "^0.2.0",
     "buffer": "^6.0.3",
     "detect-browser": "^5.3.0",
     "framer-motion": "^6.3.11",

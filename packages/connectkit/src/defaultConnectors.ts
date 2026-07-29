@@ -7,11 +7,6 @@ import {
   safe,
 } from '@wagmi/connectors';
 
-import {
-  EthereumProviderOptions as AaveAccountOptions,
-  aaveAccountConnector,
-} from '@aave/account';
-
 type DefaultConnectorsProps = {
   app: {
     name: string;
@@ -21,24 +16,18 @@ type DefaultConnectorsProps = {
   };
   walletConnectProjectId?: string;
   coinbaseWalletPreference?: CoinbaseWalletParameters<'4'>['preference'];
-  enableAaveAccount?: boolean;
-  aaveAccountOptions?: AaveAccountOptions;
 };
 
 const defaultConnectors = ({
   app,
   walletConnectProjectId,
   coinbaseWalletPreference,
-  enableAaveAccount,
-  aaveAccountOptions,
 }: DefaultConnectorsProps): CreateConnectorFn[] => {
   const hasAllAppData = app.name && app.icon && app.description && app.url;
   const shouldUseSafeConnector =
     !(typeof window === 'undefined') && window?.parent !== window;
 
-  const connectors: CreateConnectorFn[] = enableAaveAccount
-    ? [aaveAccountConnector(aaveAccountOptions)]
-    : [];
+  const connectors: CreateConnectorFn[] = [];
 
   // If we're in an iframe, include the SafeConnector
   if (shouldUseSafeConnector) {
