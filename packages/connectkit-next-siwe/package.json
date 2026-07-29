@@ -14,11 +14,13 @@
   "exports": {
     "./client": {
       "types": "./build/client.d.ts",
-      "import": "./build/client.es.js"
+      "import": "./build/client.es.js",
+      "default": "./build/client.es.js"
     },
     "./server": {
       "types": "./build/server.d.ts",
-      "import": "./build/server.es.js"
+      "import": "./build/server.es.js",
+      "default": "./build/server.es.js"
     }
   },
   "typesVersions": {

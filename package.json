@@ -23,7 +23,8 @@
     "build:nextjs-siwe": "bun run build && bun --filter nextjs-siwe build",
     "build:vite": "bun run build && bun --filter vite-example build",
     "build:testbench": "bun run build && bun run build:connectkit-next-siwe && bun --filter testbench build",
-    "build:ci": "bun run build.js && bun run --filter connectkit build && bun run --filter connectkit-next-siwe build && bun run --filter './examples/*' --if-present build && cp README.md packages/connectkit/README.md",
+    "build:examples": "bun run scripts/build-examples.mjs",
+    "build:ci": "bun run build.js && bun run --filter connectkit build && bun run --filter connectkit-next-siwe build && bun run build:examples && cp README.md packages/connectkit/README.md",
     "build:all": "bun run build:ci",
     "lint:ci": "bun run --filter '*' --if-present lint",
     "lint:all": "bun run lint:ci"
