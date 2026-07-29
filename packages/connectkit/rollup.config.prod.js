@@ -11,6 +11,7 @@ export default [
       '@wagmi/core',
       'react',
       'react-dom',
+      'react/jsx-runtime',
       'framer-motion',
       'wagmi',
     ],
@@ -23,6 +24,7 @@ export default [
       peerDepsExternal(),
       typescript({
         useTsconfigDeclarationDir: true,
+        clean: true,
         include: ['**/*.ts', '**/*.tsx'],
         exclude: 'node_modules/**',
       }),

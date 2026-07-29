@@ -253,7 +253,7 @@ export const ImToken = ({ ...props }) => (
   </svg>
 );
 
-export const Frame = ({ ...props }) => (
+export const Frame = () => (
   <svg
     width="32"
     height="32"

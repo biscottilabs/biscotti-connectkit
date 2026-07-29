@@ -238,7 +238,6 @@ const Modal: React.FC<ModalProps> = ({
   const prevDepth = usePrevious(currentDepth, currentDepth);
   if (!positionInside) useLockBodyScroll(mounted);
 
-  const prevPage = usePrevious(pageId, pageId);
 
   useEffect(() => {
     setOpen(open);
@@ -663,8 +662,6 @@ const Page: React.FC<PageProps> = ({
   children,
   open,
   initial,
-  prevDepth,
-  currentDepth,
   enterAnim,
   exitAnim,
 }) => {

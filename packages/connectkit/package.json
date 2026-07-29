@@ -26,7 +26,7 @@
   "scripts": {
     "start": "rollup --config rollup.config.dev.js -w",
     "dev": "rollup --config rollup.config.dev.js -w",
-    "build": "rollup --config rollup.config.prod.js",
+    "build": "rm -rf build && rollup --config rollup.config.prod.js",
     "lint": "eslint src --ext .ts,.tsx"
   },
   "keywords": [

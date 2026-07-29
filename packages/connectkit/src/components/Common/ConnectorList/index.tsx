@@ -33,7 +33,7 @@ const ConnectorList = () => {
   const { lastConnectorId } = useLastConnector();
   const aaveAccountConnector = useAaveAccountConnector();
 
-  let filteredWallets = wallets.filter(
+  const filteredWallets = wallets.filter(
     (wallet) => wallet.id !== aaveAccountConnector?.id
   );
 

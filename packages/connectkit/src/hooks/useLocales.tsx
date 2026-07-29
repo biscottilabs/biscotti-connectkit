@@ -58,8 +58,8 @@ const replaceMarkdown = (markdownText: string) => {
 
 const wrapTags = (text: string) => {
   // Bold markdown handling
-  const textArray = text.split(/(\*\*[^\*]*\*\*)/g);
-  let result = textArray.map((str, i) => {
+  const textArray = text.split(/(\*\*[^*]*\*\*)/g);
+  const result = textArray.map((str, i) => {
     if (/(\*\*.*\*\*)/g.test(str)) {
       // use `replace` instead of `replaceAll` to support Node 14
       return <strong key={i}>{str.replace(/\*\*/g, '')}</strong>;

@@ -7,7 +7,7 @@ import type { Chain, PublicClient, Transport } from 'viem';
 import * as allChains from 'viem/chains';
 import { generateSiweNonce, parseSiweMessage } from 'viem/siwe';
 
-export type NextSIWESession<TSessionData extends Object = {}> = IronSession &
+export type NextSIWESession<TSessionData extends object = {}> = IronSession &
   TSessionData & {
     nonce?: string;
     address?: string;
@@ -42,7 +42,7 @@ export type NextServerSIWEConfig = {
   options?: RouteHandlerOptions;
 };
 
-export type ConfigureServerSIWEResult<TSessionData extends Object = {}> = {
+export type ConfigureServerSIWEResult<TSessionData extends object = {}> = {
   apiRouteHandler: NextApiHandler;
   getSession: (
     req: IncomingMessage,
@@ -50,7 +50,7 @@ export type ConfigureServerSIWEResult<TSessionData extends Object = {}> = {
   ) => Promise<NextSIWESession<TSessionData>>;
 };
 
-const getSession = async <TSessionData extends Object = {}>(
+const getSession = async <TSessionData extends object = {}>(
   req: IncomingMessage,
   res: ServerResponse,
   sessionConfig: IronSessionOptions
@@ -201,7 +201,7 @@ const envVar = (name: string) => {
   return value;
 };
 
-export const configureServerSideSIWE = <TSessionData extends Object = {}>({
+export const configureServerSideSIWE = <TSessionData extends object = {}>({
   config,
   session: { cookieName, password, cookieOptions, ...otherSessionOptions } = {},
   options: { afterNonce, afterVerify, afterSession, afterLogout } = {},

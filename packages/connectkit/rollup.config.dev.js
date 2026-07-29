@@ -15,6 +15,7 @@ export default [
       '@wagmi/core',
       'react',
       'react-dom',
+      'react/jsx-runtime',
       'framer-motion',
       'wagmi',
     ],

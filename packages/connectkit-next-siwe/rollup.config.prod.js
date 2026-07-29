@@ -6,7 +6,14 @@ import packageJson from './package.json';
 export default [
   {
     input: './src/client.tsx',
-    external: ['connectkit', 'react', 'react-dom', 'viem', 'viem/siwe'],
+    external: [
+      'connectkit',
+      'react',
+      'react-dom',
+      'react/jsx-runtime',
+      'viem',
+      'viem/siwe',
+    ],
     output: {
       file: packageJson.exports['./client'].import,
       format: 'esm',
@@ -16,6 +23,7 @@ export default [
       peerDepsExternal(),
       typescript({
         useTsconfigDeclarationDir: true,
+        clean: true,
         include: ['**/*.ts', '**/*.tsx'],
         exclude: 'node_modules/**',
       }),
@@ -39,6 +47,7 @@ export default [
       peerDepsExternal(),
       typescript({
         useTsconfigDeclarationDir: true,
+        clean: true,
         include: ['**/*.ts', '**/*.tsx'],
         exclude: 'node_modules/**',
       }),

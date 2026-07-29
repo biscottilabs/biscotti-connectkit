@@ -14,7 +14,7 @@ import Profile from '../Pages/Profile';
 import SwitchNetworks from '../Pages/SwitchNetworks';
 import SignInWithEthereum from '../Pages/SignInWithEthereum';
 
-import { getAppIcon, getAppName } from '../../defaultConfig';
+import { getAppName } from '../../defaultConfig';
 import { ConnectKitThemeProvider } from '../ConnectKitThemeProvider/ConnectKitThemeProvider';
 import { useChainIsSupported } from '../../hooks/useChainIsSupported';
 

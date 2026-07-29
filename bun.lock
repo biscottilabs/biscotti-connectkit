@@ -20,6 +20,7 @@
         "rollup-plugin-typescript2": "^0.34.0",
         "rollup-plugin-visualizer": "^5.5.4",
         "tslib": "^1.9.3",
+        "typescript": "5.3.3",
         "typescript-plugin-styled-components": "^2.0.0",
         "viem": "^2.23.2",
         "wagmi": "^2.14.11",
@@ -184,15 +185,15 @@
     },
     "packages/connectkit-next-siwe": {
       "name": "connectkit-next-siwe",
-      "version": "0.3.0",
+      "version": "0.4.0",
       "dependencies": {
         "iron-session": "^6.2.1",
-        "viem": "^2.23.2",
       },
       "devDependencies": {
         "@types/node": "^16.11.27",
         "@types/react": "^18.0.6",
         "@types/react-dom": "^18.0.2",
+        "connectkit": "workspace:packages/connectkit",
         "typescript": "5.3.3",
       },
       "peerDependencies": {

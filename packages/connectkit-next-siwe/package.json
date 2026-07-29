@@ -1,6 +1,6 @@
 {
   "name": "connectkit-next-siwe",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "author": "Aave",
   "homepage": "https://docs.family.co/connectkit",
   "license": "BSD-2-Clause license",
@@ -37,12 +37,13 @@
   },
   "files": [
     "build",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "start": "rollup --config rollup.config.dev.js -w",
     "dev": "rollup --config rollup.config.dev.js -w",
-    "build": "rollup --config rollup.config.prod.js",
+    "build": "rm -rf build && rollup --config rollup.config.prod.js",
     "lint": "eslint src --ext .ts,.tsx"
   },
   "keywords": [
@@ -56,8 +57,7 @@
     "react"
   ],
   "dependencies": {
-    "iron-session": "^6.2.1",
-    "viem": "^2.23.2"
+    "iron-session": "^6.2.1"
   },
   "peerDependencies": {
     "connectkit": ">=1.2.0",
@@ -67,6 +67,7 @@
     "viem": ">=2.13.3"
   },
   "devDependencies": {
+    "connectkit": "workspace:packages/connectkit",
     "@types/node": "^16.11.27",
     "@types/react": "^18.0.6",
     "@types/react-dom": "^18.0.2",

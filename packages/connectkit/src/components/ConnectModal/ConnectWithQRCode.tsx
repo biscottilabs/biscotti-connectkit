@@ -4,7 +4,6 @@ import { routes, useContext } from '../ConnectKit';
 import { useWalletConnectModal } from '../../hooks/useWalletConnectModal';
 
 import {
-  detectBrowser,
   isAaveAccountConnector,
   isWalletConnectConnector,
 } from '../../utils';
@@ -48,27 +47,8 @@ const ConnectWithQRCode: React.FC<{
   if (!wallet) return <>Wallet not found {context.connector.id}</>;
 
   const downloads = wallet?.downloadUrls;
-  const extensions = {
-    chrome: downloads?.chrome,
-    firefox: downloads?.firefox,
-    brave: downloads?.brave,
-    edge: downloads?.edge,
-    safari: downloads?.safari,
-  };
-
-  const browser = detectBrowser();
 
   const hasApps = downloads && Object.keys(downloads).length !== 0;
-
-  const suggestedExtension = extensions
-    ? {
-        name: Object.keys(extensions)[0],
-        label:
-          Object.keys(extensions)[0]?.charAt(0).toUpperCase() +
-          Object.keys(extensions)[0]?.slice(1), // Capitalise first letter, but this might be better suited as a lookup table
-        url: extensions[Object.keys(extensions)[0]],
-      }
-    : undefined;
 
   const showAdditionalOptions = isWalletConnectConnector(id);
 

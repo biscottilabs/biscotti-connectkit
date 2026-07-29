@@ -25,7 +25,6 @@ import {
   useConnectCallback,
   useConnectCallbackProps,
 } from '../hooks/useConnectCallback';
-import { useConnector } from '../hooks/useConnectors';
 import { WagmiContext, useAccount } from 'wagmi';
 import { Web3ContextProvider } from './contexts/web3';
 import { useChainIsSupported } from '../hooks/useChainIsSupported';
@@ -136,8 +135,6 @@ export const ConnectKitProvider = ({
   });
 
   const chains = useChains();
-
-  const injectedConnector = useConnector('injected');
 
   // Default config options
   const defaultOptions: ConnectKitOptions = {

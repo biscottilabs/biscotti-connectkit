@@ -34,14 +34,13 @@ const About: React.FC = () => {
   const ctaUrl =
     context.options?.ethereumOnboardingUrl ?? locales.aboutScreen_ctaUrl;
 
-  const [ready, setReady] = useState(true);
+  const [, setReady] = useState(true);
   const [slider, setSlider] = useState(0);
   const interacted = useRef(false);
   const scrollPos = useRef(0);
 
   const animationEase: Easing = [0.16, 1, 0.3, 1];
   const animationDuration = 600;
-  const autoplayDelay = 5100;
 
   let interval: ReturnType<typeof setTimeout>;
   useEffect(() => {
@@ -65,17 +64,6 @@ const About: React.FC = () => {
     } else {
       setSlider(index);
     }
-  };
-
-  const nextSlide = () => {
-    if (interacted.current) return;
-
-    setSlider((prevSlider) => {
-      const index = (prevSlider + 1) % slides.length;
-      scrollToSlide(index);
-      return index;
-    });
-    interval = setTimeout(nextSlide, autoplayDelay);
   };
 
   const scrollToSlide = (index: number) => {

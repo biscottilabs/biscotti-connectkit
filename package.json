@@ -23,7 +23,7 @@
     "build:nextjs-siwe": "bun run build && bun --filter nextjs-siwe build",
     "build:vite": "bun run build && bun --filter vite-example build",
     "build:testbench": "bun run build && bun run build:connectkit-next-siwe && bun --filter testbench build",
-    "build:ci": "bun run build.js && bun run --filter '*' --if-present build && cp README.md packages/connectkit/README.md",
+    "build:ci": "bun run build.js && bun run --filter connectkit build && bun run --filter connectkit-next-siwe build && bun run --filter './examples/*' --if-present build && cp README.md packages/connectkit/README.md",
     "build:all": "bun run build:ci",
     "lint:ci": "bun run --filter '*' --if-present lint",
     "lint:all": "bun run lint:ci"
@@ -41,6 +41,7 @@
     "rollup-plugin-typescript2": "^0.34.0",
     "rollup-plugin-visualizer": "^5.5.4",
     "tslib": "^1.9.3",
+    "typescript": "5.3.3",
     "typescript-plugin-styled-components": "^2.0.0",
     "viem": "^2.23.2",
     "wagmi": "^2.14.11"

@@ -129,7 +129,7 @@ const themeColors = {
  *  Automatically use p3 if available
  */
 //  TODO: Don't use :any type
-const createCssVars = (scheme: any, important?: boolean) => {
+const createCssVars = (scheme: any, _important?: boolean) => {
   return css`
     ${Object.keys(scheme).map((key) => {
       const value = scheme[key];
@@ -242,7 +242,7 @@ export const ResetContainer = styled(motion.div)<{
     }
   }}
 
-  ${(props) => {
+  ${() => {
     switch (mode) {
       case 'light':
         return globalsLight;

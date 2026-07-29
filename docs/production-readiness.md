@@ -246,13 +246,82 @@ settled means doing it twice. Revisit once steps 1–5 are done and the rename b
 
 ```sh
 bun install --frozen-lockfile          # reproducible install (CI)
-bun run --filter '*' build             # build every workspace
-bun run --filter '*' lint              # lint every workspace
+bun run build:ci                       # ordered build of every workspace
+bun run lint:ci                        # lint every workspace
 bun run --filter <name> <script>       # single workspace
 bunx madge --circular packages/connectkit/src
 ```
+
+> Do **not** use `bun run --filter '*' build`. Bun does not topologically order workspace
+> builds, so the examples can start before `connectkit` has emitted its declarations. See §8.
 
 Workspace names differ from directory names in one case: `examples/vite` is `vite-example`.
 
 **Not migration debt** — pre-existing, safe to ignore for now: the `pino-pretty` optional-peer
 warning from WalletConnect, and the `swcMinify` key deprecated in Next 15.
+
+---
+
+## 8. Hardening pass
+
+Applied after the remediation above. Verified from a full clean room (`node_modules`, `build/`,
+`.next/`, rpt2 caches all removed): install, build, and lint each exit 0.
+
+### Two latent bugs found
+
+**Build order was never correct.** `build:ci` used `bun run --filter '*' build`, but Bun does not
+topologically order workspace scripts — not even with an explicit workspace dependency declared.
+`connectkit-next-siwe` and the examples were starting before `connectkit` had emitted
+`build/index.d.ts`, failing with `TS2307: Cannot find module 'connectkit'`.
+
+This never surfaced because stale `build/` output from previous local runs always satisfied the
+resolution. Adding a clean step exposed it. On a fresh CI checkout it would have failed.
+`build:ci` now sequences the two library packages explicitly and globs the examples:
+
+```
+bun run build.js
+  && bun run --filter connectkit build
+  && bun run --filter connectkit-next-siwe build
+  && bun run --filter './examples/*' --if-present build
+```
+
+**rollup-plugin-typescript2 poisoned its own cache.** When the clean step removed
+`connectkit/build` mid-build, rpt2 cached the `Cannot find module` result in
+`packages/*/node_modules/.cache/` and kept returning it on every later build, even once the file
+existed again. Fixed with `clean: true` in both production rollup configs — deterministic builds,
+no cross-run cache.
+
+### Changes
+
+- **ESLint now enforces rules.** The config had a parser and plugin but no `extends` and no
+  `rules`, so 153 files linted with zero rules applied — a file with unused vars, `==`, `debugger`
+  and explicit `any` passed clean. Now extends `eslint:recommended` +
+  `plugin:@typescript-eslint/recommended`. 126 real violations surfaced; all 126 fixed or
+  configured. `browser` and `node` environments are scoped per directory instead of both being
+  granted everywhere, so client code can no longer reference Node globals unnoticed.
+- **`@typescript-eslint/no-explicit-any` is set to `warn`, not off.** 61 legacy sites remain and
+  are reported on every lint run. Fixing them needs real type work that risks behaviour changes, so
+  they are tracked as visible debt rather than silently suppressed. Burn this down over time.
+- **`viem` is peer-only** in `connectkit-next-siwe`; it was declared as both a direct and a peer
+  dependency, which could resolve two copies in a consuming app.
+- **`connectkit` declared as a workspace devDependency** of `connectkit-next-siwe`. It was a real
+  build-time dependency that was only listed as a peer.
+- **Build output is cleaned before each build** in both packages. `build/` previously retained the
+  pre-split `index.es.js` — the old fused bundle with `iron-session` in it — and `files: ["build"]`
+  would have published it.
+- **`connectkit-next-siwe` bumped 0.3.0 → 0.4.0** with a `CHANGELOG.md`, since removing the root
+  export is breaking. Pre-1.0, so a minor bump per semver.
+- **`react/jsx-runtime` externalised explicitly** in all four rollup configs. It was previously
+  external only by accident of being unresolved.
+
+### Reversed recommendation: keep the global `typescript` override
+
+An earlier draft of this document recommended removing `"typescript": "5.3.3"` from root
+`overrides` as a blunt instrument. Testing showed it is load-bearing:
+`typescript-plugin-styled-components@2.0.0` (used by `packages/connectkit/rollup.config.dev.js`)
+declares `peerDependencies.typescript: ^4.0`, which 5.3.3 does not satisfy. Without the override
+every `bun install` prints `incorrect peer dependency "typescript@5.3.3"`.
+
+Every workspace already pins 5.3.3 directly, so the override changes no actual resolution — its
+only effect is suppressing that one stale peer range. It was restored. Revisit if
+`typescript-plugin-styled-components` is ever updated or dropped.

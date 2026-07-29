@@ -19,7 +19,7 @@ export const save = (storageKey: string, data: any[]) => {
   try {
     localStorage.setItem(storageKey, JSON.stringify(data));
     return get(storageKey);
-  } catch (e) {
+  } catch {
     return [];
   }
 };
@@ -29,7 +29,7 @@ export const get = (storageKey: string) => {
     const data = localStorage.getItem(storageKey);
     if (data) return JSON.parse(data);
     return [];
-  } catch (e) {
+  } catch {
     // error parsing data, reset
     save(storageKey, []);
     return [];
