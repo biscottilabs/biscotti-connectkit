@@ -12,6 +12,12 @@ export default [
       format: 'esm',
       sourcemap: false,
     },
-    plugins: [peerDepsExternal(), typescript()],
+    plugins: [
+      peerDepsExternal(),
+      typescript({
+        include: ['**/*.ts', '**/*.tsx'],
+        exclude: 'node_modules/**',
+      }),
+    ],
   },
 ];

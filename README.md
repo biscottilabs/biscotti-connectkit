@@ -48,22 +48,22 @@ Clone the ConnectKit project and install the necessary dependencies:
 ```sh
 $ git clone git@github.com:family/connectkit.git
 $ cd connectkit
-$ yarn install
+$ bun install
 ```
 
 and start the code bundler:
 
 ```sh
-$ yarn dev:connectkit
-$ yarn dev:connectkit-next-siwe
+$ bun run dev:connectkit
+$ bun run dev:connectkit-next-siwe
 ```
 
 and then simply select the example you'd like to run:
 
 ```sh
-$ yarn dev:vite # Vite
-$ yarn dev:nextjs # Next.js
-$ yarn dev:nextjs-siwe # Next.js with SIWE
+$ bun run dev:vite # Vite
+$ bun run dev:nextjs # Next.js
+$ bun run dev:nextjs-siwe # Next.js with SIWE
 ```
 
 ## Contribute
