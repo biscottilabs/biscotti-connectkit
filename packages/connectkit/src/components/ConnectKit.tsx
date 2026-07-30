@@ -28,6 +28,7 @@ import {
 import { WagmiContext, useAccount } from 'wagmi';
 import { Web3ContextProvider } from './contexts/web3';
 import { useChainIsSupported } from '../hooks/useChainIsSupported';
+import type { CircleOptions } from '../circle';
 
 export const routes = {
   ONBOARDING: 'onboarding',
@@ -95,6 +96,9 @@ export type ConnectKitOptions = {
   walletOnboardingUrl?: string;
   disableSiweRedirect?: boolean; // Disable redirect to SIWE page after a wallet is connected
   overlayBlur?: number; // Blur the background when the modal is open
+  // Sign in with Circle (user-controlled wallets). Opt-in: omitting this
+  // disables the integration entirely and adds nothing to the bundle.
+  circle?: CircleOptions;
 };
 
 type ConnectKitProviderProps = {

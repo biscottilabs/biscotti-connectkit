@@ -15,6 +15,31 @@ export {
 export type { SIWESession, SIWEConfig } from './siwe';
 
 export { ConnectKitProvider, Context } from './components/ConnectKit';
+
+// Sign in with Circle (user-controlled wallets)
+export {
+  isCircleEnabled,
+  preflightCircleConfig,
+  createHttpBackendAdapter,
+  CircleBackendError,
+  CIRCLE_DEFAULT_BASE_PATH,
+  circleChainsByChainId,
+  toCircleBlockchain,
+  toChainId,
+  isCircleSupportedChain,
+} from './circle';
+export type {
+  CircleOptions,
+  CircleLoginMethod,
+  CircleConfigIssue,
+  CircleConfigScope,
+  CircleBackendAdapter,
+  CircleEndpointConfig,
+  CircleWallet,
+  CircleBlockchain,
+  CircleChainMap,
+  CircleHealthReport,
+} from './circle';
 export { ConnectKitButton } from './components/ConnectButton';
 export { default as SIWEButton } from './components/Standard/SIWE';
 
