@@ -4,7 +4,7 @@ import App from './App';
 import reportWebVitals from './reportWebVitals';
 
 import { WagmiProvider, createConfig } from 'wagmi';
-import { ConnectKitProvider, getDefaultConfig } from 'connectkit';
+import { ConnectKitProvider, getDefaultConfig } from 'biscotti-finance-connectkit';
 
 const config = createConfig(
   getDefaultConfig({

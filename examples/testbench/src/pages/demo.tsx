@@ -1,6 +1,6 @@
 import type { NextPage } from 'next';
 
-import { ConnectKitModalDemo } from 'connectkit';
+import { ConnectKitModalDemo } from 'biscotti-finance-connectkit';
 
 const Demo: NextPage = () => {
   return <ConnectKitModalDemo open />;

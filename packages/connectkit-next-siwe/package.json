@@ -1,13 +1,13 @@
 {
-  "name": "connectkit-next-siwe",
+  "name": "biscotti-finance-connectkit-next-siwe",
   "version": "0.4.0",
-  "author": "Aave",
-  "homepage": "https://docs.family.co/connectkit",
-  "license": "BSD-2-Clause license",
+  "author": "Biscotti Finance",
+  "homepage": "https://github.com/biscottilabs/biscotti-connectkit",
+  "license": "BSD-2-Clause",
   "description": "Connecting a wallet, made simple.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/family/connectkit.git",
+    "url": "git+https://github.com/biscottilabs/biscotti-connectkit.git",
     "directory": "packages/connectkit-next-siwe"
   },
   "type": "module",
@@ -40,7 +40,8 @@
   "files": [
     "build",
     "README.md",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "LICENSE"
   ],
   "scripts": {
     "start": "rollup --config rollup.config.dev.js -w",
@@ -53,8 +54,6 @@
     "react-hook",
     "blockchain",
     "hooks",
-    "family",
-    "aave",
     "ethereum",
     "react"
   ],
@@ -62,14 +61,14 @@
     "iron-session": "^6.2.1"
   },
   "peerDependencies": {
-    "connectkit": ">=1.2.0",
+    "biscotti-finance-connectkit": ">=1.2.0",
     "next": ">=12.x",
     "react": "17.x || 18.x",
     "react-dom": "17.x || 18.x",
     "viem": ">=2.13.3"
   },
   "devDependencies": {
-    "connectkit": "workspace:packages/connectkit",
+    "biscotti-finance-connectkit": "workspace:packages/connectkit",
     "@types/node": "^16.11.27",
     "@types/react": "^18.0.6",
     "@types/react-dom": "^18.0.2",

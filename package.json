@@ -1,7 +1,7 @@
 {
-  "name": "aave-connectkit",
+  "name": "biscotti-finance-connectkit-monorepo",
   "version": "0.0.0",
-  "description": "Aave ConnectKit",
+  "description": "Biscotti Finance ConnectKit",
   "main": "packages/connectkit/src/index.ts",
   "private": true,
   "workspaces": [
@@ -9,22 +9,22 @@
     "examples/*"
   ],
   "scripts": {
-    "dev:connectkit": "bun --filter connectkit dev",
-    "dev:connectkit-next-siwe": "bun --filter connectkit-next-siwe dev",
+    "dev:connectkit": "bun --filter biscotti-finance-connectkit dev",
+    "dev:connectkit-next-siwe": "bun --filter biscotti-finance-connectkit-next-siwe dev",
     "dev:nextjs": "bun --filter nextjs dev",
     "dev:nextjs-app": "bun --filter nextjs-app dev",
     "dev:nextjs-siwe": "bun --filter nextjs-siwe dev",
     "dev:vite": "bun --filter vite-example dev",
     "dev:testbench": "bun --filter testbench dev",
-    "build": "bun run build.js && bun --filter connectkit build && cp README.md packages/connectkit/README.md",
-    "build:connectkit-next-siwe": "bun --filter connectkit-next-siwe build",
+    "build": "bun run build.js && bun --filter biscotti-finance-connectkit build && cp README.md packages/connectkit/README.md",
+    "build:connectkit-next-siwe": "bun --filter biscotti-finance-connectkit-next-siwe build",
     "build:nextjs": "bun run build && bun --filter nextjs build",
     "build:nextjs-app": "bun run build && bun --filter nextjs-app build",
     "build:nextjs-siwe": "bun run build && bun --filter nextjs-siwe build",
     "build:vite": "bun run build && bun --filter vite-example build",
     "build:testbench": "bun run build && bun run build:connectkit-next-siwe && bun --filter testbench build",
     "build:examples": "bun run scripts/build-examples.mjs",
-    "build:ci": "bun run build.js && bun run --filter connectkit build && bun run --filter connectkit-next-siwe build && bun run build:examples && cp README.md packages/connectkit/README.md",
+    "build:ci": "bun run build.js && bun run --filter biscotti-finance-connectkit build && bun run --filter biscotti-finance-connectkit-next-siwe build && bun run build:examples && cp README.md packages/connectkit/README.md",
     "build:all": "bun run build:ci",
     "lint:ci": "bun run --filter '*' --if-present lint",
     "lint:all": "bun run lint:ci"

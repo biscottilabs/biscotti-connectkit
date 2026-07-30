@@ -1,7 +1,7 @@
 'use client';
 
 import { useAccount, useConnect, useDisconnect } from 'wagmi';
-import { ConnectKitButton } from 'connectkit';
+import { ConnectKitButton } from 'biscotti-finance-connectkit';
 
 function App() {
   const account = useAccount();

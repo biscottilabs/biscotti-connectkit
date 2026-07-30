@@ -1,4 +1,4 @@
-import { configureServerSideSIWE } from 'connectkit-next-siwe/server';
+import { configureServerSideSIWE } from 'biscotti-finance-connectkit-next-siwe/server';
 import { ckConfig } from '../components/Web3Provider';
 
 export const siweServer = configureServerSideSIWE({

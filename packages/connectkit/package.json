@@ -1,13 +1,13 @@
 {
-  "name": "connectkit",
-  "version": "1.9.2",
-  "author": "Aave",
-  "homepage": "https://docs.family.co/connectkit",
-  "license": "BSD-2-Clause license",
+  "name": "biscotti-finance-connectkit",
+  "version": "2.0.0",
+  "author": "Biscotti Finance",
+  "homepage": "https://github.com/biscottilabs/biscotti-connectkit",
+  "license": "BSD-2-Clause",
   "description": "Connecting a wallet, made simple.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/family/connectkit.git",
+    "url": "git+https://github.com/biscottilabs/biscotti-connectkit.git",
     "directory": "packages/connectkit"
   },
   "type": "module",
@@ -22,7 +22,8 @@
   },
   "files": [
     "build",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "start": "rollup --config rollup.config.dev.js -w",

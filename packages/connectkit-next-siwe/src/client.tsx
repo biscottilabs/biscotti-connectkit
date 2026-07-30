@@ -1,5 +1,5 @@
 import type { ComponentProps, FunctionComponent } from 'react';
-import { SIWEProvider } from 'connectkit';
+import { SIWEProvider } from 'biscotti-finance-connectkit';
 import { createSiweMessage } from 'viem/siwe';
 
 export type NextClientSIWEConfig = {

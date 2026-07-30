@@ -1,4 +1,4 @@
-import { ConnectKitButton } from 'connectkit';
+import { ConnectKitButton } from 'biscotti-finance-connectkit';
 
 function App() {
   return (

@@ -12,7 +12,7 @@
     "@tanstack/react-query": "^5.17.15",
     "@wagmi/connectors": "5.7.7",
     "@wagmi/core": "2.16.4",
-    "connectkit": "workspace:packages/connectkit",
+    "biscotti-finance-connectkit": "workspace:packages/connectkit",
     "next": "15.5.14",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
