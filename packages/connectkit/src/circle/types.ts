@@ -156,3 +156,14 @@ export type CircleOptions = {
   /** Label in the wallet list. Defaults to "Sign in with Circle". */
   name?: string;
 };
+
+/**
+ * Circle is opt-in: an app that never sets `circle` pays nothing for it. An
+ * explicit `enabled: false` keeps configuration in place while disabling the
+ * feature, which is what per-environment rollout needs.
+ *
+ * Defined here rather than in the barrel so feature modules can import it
+ * without creating a cycle through `circle/index.ts`.
+ */
+export const isCircleEnabled = (circle: CircleOptions | undefined): boolean =>
+  !!circle && circle.enabled !== false;

@@ -50,6 +50,7 @@
     "styled-components": "^5.3.5"
   },
   "peerDependencies": {
+    "@circle-fin/w3s-pw-web-sdk": ">=1.1.0",
     "@tanstack/react-query": ">=5.0.0",
     "@wagmi/connectors": "5.x",
     "@wagmi/core": "2.x",
@@ -58,7 +59,13 @@
     "viem": "2.x",
     "wagmi": "2.x"
   },
+  "peerDependenciesMeta": {
+    "@circle-fin/w3s-pw-web-sdk": {
+      "optional": true
+    }
+  },
   "devDependencies": {
+    "@circle-fin/w3s-pw-web-sdk": "^1.1.11",
     "@types/node": "18.7.18",
     "@types/qrcode": "^1.4.2",
     "@types/react": "^18.0.6",

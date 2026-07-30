@@ -2,6 +2,7 @@
 
 import { useAccount, useConnect, useDisconnect } from 'wagmi';
 import { ConnectKitButton } from 'biscotti-finance-connectkit';
+import { CirclePanel } from './circle-panel';
 
 function App() {
   const account = useAccount();
@@ -42,6 +43,7 @@ function App() {
         <div>{status}</div>
         <div>{error?.message}</div>
       </div>
+      <CirclePanel />
     </>
   );
 }

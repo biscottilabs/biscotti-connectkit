@@ -1,5 +1,3 @@
-import type { CircleOptions } from './types';
-
 export type {
   CircleOptions,
   CircleLoginMethod,
@@ -12,7 +10,7 @@ export type {
   CircleChallengeResponse,
   CircleHealthReport,
 } from './types';
-export { CIRCLE_IMPLEMENTED_METHODS } from './types';
+export { CIRCLE_IMPLEMENTED_METHODS, isCircleEnabled } from './types';
 
 export type { CircleBlockchain, CircleChainMap } from './chains';
 export {
@@ -36,10 +34,22 @@ export {
   CIRCLE_DEFAULT_BASE_PATH,
 } from './backend';
 
-/**
- * Circle is opt-in: an app that never sets `circle` pays nothing for it. An
- * explicit `enabled: false` keeps configuration in place while disabling the
- * feature, which is what per-environment rollout needs.
- */
-export const isCircleEnabled = (circle: CircleOptions | undefined): boolean =>
-  !!circle && circle.enabled !== false;
+export { loadCircleSdk, getCircleSdk, resetCircleSdk, executeChallenge } from './sdk';
+export type { CircleSdk, CircleChallengeResult } from './sdk';
+
+export {
+  beginGoogleLogin,
+  resumeGoogleLogin,
+  ensureWallet,
+  looksLikeOAuthReturn,
+} from './login';
+
+export {
+  readSession,
+  clearSession,
+  isSessionExpired,
+} from './session';
+export type { CircleSession } from './session';
+
+export { useCircleLogin } from './useCircleLogin';
+export type { CircleLoginStatus, UseCircleLoginResult } from './useCircleLogin';

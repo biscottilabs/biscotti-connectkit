@@ -12,7 +12,22 @@ export function Providers(props: { children: ReactNode }) {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        <ConnectKitProvider>{props.children}</ConnectKitProvider>
+        <ConnectKitProvider
+          debugMode
+          options={{
+            // Sign in with Circle. Leaving the env vars unset does not break
+            // anything — the preflight check reports exactly what is missing.
+            circle: {
+              appId: process.env.NEXT_PUBLIC_CIRCLE_APP_ID,
+              google: {
+                clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+              },
+              defaultChainId: 84532, // Base Sepolia
+            },
+          }}
+        >
+          {props.children}
+        </ConnectKitProvider>
       </QueryClientProvider>
     </WagmiProvider>
   );

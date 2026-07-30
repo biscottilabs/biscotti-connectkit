@@ -1,11 +1,13 @@
 import { getDefaultConfig } from 'biscotti-finance-connectkit';
 import { createConfig } from 'wagmi';
-import { mainnet, polygon, optimism, arbitrum } from 'wagmi/chains';
+import { mainnet, polygon, optimism, arbitrum, baseSepolia } from 'wagmi/chains';
 
 export const config = createConfig(
   getDefaultConfig({
+    // Base Sepolia is listed because Circle sandbox API keys only work against
+    // testnets — a sandbox key on mainnet fails with an opaque auth error.
     appName: 'ConnectKit Next.js demo',
-    chains: [mainnet, polygon, optimism, arbitrum],
+    chains: [mainnet, polygon, optimism, arbitrum, baseSepolia],
     walletConnectProjectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID!,
   })
 );

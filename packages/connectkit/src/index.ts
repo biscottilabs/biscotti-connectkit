@@ -27,8 +27,14 @@ export {
   toCircleBlockchain,
   toChainId,
   isCircleSupportedChain,
+  useCircleLogin,
+  readSession as readCircleSession,
+  clearSession as clearCircleSession,
 } from './circle';
 export type {
+  CircleSession,
+  CircleLoginStatus,
+  UseCircleLoginResult,
   CircleOptions,
   CircleLoginMethod,
   CircleConfigIssue,
