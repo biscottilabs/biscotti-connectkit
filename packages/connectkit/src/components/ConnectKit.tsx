@@ -40,6 +40,7 @@ export const routes = {
   PROFILE: 'profile',
   SWITCHNETWORKS: 'switchNetworks',
   SIGNINWITHETHEREUM: 'signInWithEthereum',
+  CIRCLE: 'circle',
 };
 
 type Connector = {

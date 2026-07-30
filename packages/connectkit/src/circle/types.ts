@@ -155,6 +155,13 @@ export type CircleOptions = {
 
   /** Label in the wallet list. Defaults to "Sign in with Circle". */
   name?: string;
+
+  /**
+   * Gas strategy for transactions. Circle prices its own transactions by fee
+   * level and rejects explicit gas fields, so any gas the caller sets is
+   * ignored in favour of this. Defaults to `MEDIUM`.
+   */
+  feeLevel?: 'LOW' | 'MEDIUM' | 'HIGH';
 };
 
 /**

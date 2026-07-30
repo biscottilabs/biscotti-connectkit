@@ -23,6 +23,7 @@ import {
 } from '../../../utils';
 import { useLastConnector } from '../../../hooks/useLastConnector';
 import { useConnect } from '../../../hooks/useConnect';
+import { CIRCLE_CONNECTOR_ID } from '../../../circle/connector';
 
 const ConnectorList = () => {
   const context = useContext();
@@ -33,7 +34,7 @@ const ConnectorList = () => {
 
   const filteredWallets = wallets;
 
-  const walletsToDisplay =
+  const recentSorted =
     context.options?.hideRecentBadge || lastConnectorId === 'walletConnect' // do not hoist walletconnect to top of list
       ? filteredWallets
       : [
@@ -46,6 +47,14 @@ const ConnectorList = () => {
             (wallet) => lastConnectorId !== wallet.connector.id
           ),
         ];
+
+  // Circle outranks even the recently-used hoist. It is the entry point for
+  // people who have no wallet at all, and they are precisely the users who will
+  // not scan past the first row to find it.
+  const walletsToDisplay = [
+    ...recentSorted.filter((wallet) => wallet.id === CIRCLE_CONNECTOR_ID),
+    ...recentSorted.filter((wallet) => wallet.id !== CIRCLE_CONNECTOR_ID),
+  ];
 
   return (
     <ScrollArea mobileDirection={'horizontal'}>
@@ -104,6 +113,10 @@ const ConnectorItem = ({
       ? wallet.getWalletConnectDeeplink?.(uri ?? '')
       : undefined;
 
+  // Circle is not a wallet you "connect" to — it signs you in and provisions a
+  // wallet, so it gets its own screen rather than the injector/QR flow.
+  const isCircle = wallet.id === CIRCLE_CONNECTOR_ID;
+
   const redirectToMoreWallets = isMobile && isWalletConnectConnector(wallet.id);
   // Safari requires opening popup on user gesture, so we connect immediately here
   const shouldConnectImmediately =
@@ -123,7 +136,10 @@ const ConnectorItem = ({
         deeplink
           ? undefined
           : () => {
-              if (redirectToMoreWallets) {
+              if (isCircle) {
+                context.setRoute(routes.CIRCLE);
+                context.setConnector({ id: wallet.id });
+              } else if (redirectToMoreWallets) {
                 context.setRoute(routes.MOBILECONNECTORS);
               } else {
                 if (shouldConnectImmediately) {

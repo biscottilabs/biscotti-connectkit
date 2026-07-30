@@ -152,3 +152,34 @@ export const executeChallenge = async (
     });
   });
 };
+
+type MaybeSigned = {
+  data?: { signature?: string; txHash?: string };
+};
+
+/**
+ * Pulls the signature out of a completed challenge.
+ *
+ * Circle returns it inline on the challenge result, so a signature never needs
+ * polling — but the field is optional on the shared result type, hence the
+ * explicit check rather than a cast.
+ */
+export const extractSignature = (result: CircleChallengeResult): string => {
+  const signature = (result as MaybeSigned).data?.signature;
+  if (!signature) {
+    throw new Error(
+      'The Circle challenge completed but returned no signature.'
+    );
+  }
+  return signature;
+};
+
+export const extractTxHash = (result: CircleChallengeResult): string => {
+  const txHash = (result as MaybeSigned).data?.txHash;
+  if (!txHash) {
+    throw new Error(
+      'The Circle challenge completed but returned no transaction hash.'
+    );
+  }
+  return txHash;
+};

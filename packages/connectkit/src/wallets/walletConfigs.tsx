@@ -1,4 +1,5 @@
 import Logos from '../assets/logos';
+import { CircleLogo } from '../assets/circle';
 import { isAndroid } from '../utils';
 
 /**
@@ -52,6 +53,12 @@ export const walletConfigs: {
 } = {
   mock: {
     icon: <Logos.Mock />,
+  },
+  circle: {
+    name: 'Sign in with Circle',
+    shortName: 'Circle',
+    icon: <CircleLogo width={32} height={32} />,
+    iconShape: 'circle',
   },
   argent: {
     name: 'Argent',

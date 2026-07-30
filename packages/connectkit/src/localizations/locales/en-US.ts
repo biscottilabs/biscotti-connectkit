@@ -115,6 +115,35 @@ const enUS = {
     'You successfully verified yourself \n as the owner of this wallet.',
   signInWithEthereumScreen_signedIn_p: `Signing out will require you to \n authenticate again in the future.`,
   signInWithEthereumScreen_signedIn_button: 'Sign Out',
+
+  circleScreen_heading: 'Sign in with Circle',
+  circleScreen_h1: 'Create a wallet with the account you already have.',
+  circleScreen_p:
+    'Circle secures your wallet with a PIN. No extension or seed phrase needed.',
+  circleScreen_continueWithGoogle: 'Continue with Google',
+  circleScreen_continueWithEmail: 'Email & one-time code',
+  circleScreen_continueWithPin: 'PIN only',
+  circleScreen_comingSoon: 'Coming soon',
+  circleScreen_securedByCircle: 'Secured by Circle',
+  circleScreen_redirecting: 'Redirecting to Google…',
+  circleScreen_awaitingPin: 'Finish setting up your wallet',
+  circleScreen_awaitingPin_p:
+    'Follow the prompts from Circle to set your PIN and create your wallet.',
+  circleScreen_creatingWallet: 'Creating your wallet…',
+  circleScreen_connected: 'Wallet ready',
+
+  // Shown to end users in production, where configuration detail must not leak.
+  circleScreen_unavailable_heading: 'Temporarily unavailable',
+  circleScreen_unavailable_p:
+    'Sign in with Circle is not available right now. Please try another option or contact support.',
+
+  // Developer-facing. Rendered only in debug mode or outside production.
+  circleScreen_misconfigured_heading: 'Circle is not configured',
+  circleScreen_misconfigured_p:
+    'This message is only visible to developers. Resolve the items below to enable Sign in with Circle:',
+  circleScreen_scope_client: 'Client env',
+  circleScreen_scope_server: 'Server env',
+  circleScreen_scope_console: 'Circle / Google console',
 };
 
 export default enUS;

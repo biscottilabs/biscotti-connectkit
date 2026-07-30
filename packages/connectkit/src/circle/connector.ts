@@ -1,11 +1,21 @@
 import { createConnector } from '@wagmi/core';
-import { getAddress, type Address, type Chain } from 'viem';
+import { formatEther, getAddress, isHex, type Address, type Chain } from 'viem';
 
 import { resolveBackendAdapter } from './backend';
 import { toCircleBlockchain } from './chains';
 import { beginGoogleLogin } from './login';
-import { createCircleProvider, type CircleProvider } from './provider';
-import { resetCircleSdk } from './sdk';
+import {
+  createCircleProvider,
+  CircleNotConnectedError,
+  type CircleProvider,
+} from './provider';
+import {
+  executeChallenge,
+  extractSignature,
+  extractTxHash,
+  getCircleSdk,
+  resetCircleSdk,
+} from './sdk';
 import {
   clearSession,
   readSession,
@@ -44,12 +54,89 @@ export const circleConnector = ({ circle }: CircleConnectorParameters) =>
     const currentChainId = (): number =>
       readSession()?.chainId ?? fallbackChainId();
 
+    /**
+     * Every signing operation follows the same shape: ask the backend for a
+     * challenge, then hand it to the SDK, which opens Circle's hosted PIN UI
+     * and returns the result once the user authorises.
+     */
+    const runChallenge = async (
+      request: (session: CircleSession) => Promise<{ challengeId: string }>
+    ) => {
+      const session = readSession();
+      if (!session?.walletId) throw new CircleNotConnectedError();
+
+      const { challengeId } = await request(session);
+
+      const sdk = await getCircleSdk();
+      sdk.setAuthentication({
+        userToken: session.userToken,
+        encryptionKey: session.encryptionKey,
+      });
+
+      return executeChallenge(sdk, challengeId);
+    };
+
     const provider = createCircleProvider({
       chains: config.chains,
       transports: config.transports,
       getSession: readSession,
       getChainId: currentChainId,
-      // Signing and transactions are installed in the phases that follow.
+
+      signMessage: async (message) => {
+        const result = await runChallenge((session) =>
+          adapter.signMessage({
+            userToken: session.userToken,
+            walletId: session.walletId!,
+            message,
+            // viem hex-encodes the message before calling personal_sign. Passing
+            // it through as hex preserves the exact bytes; decoding to a string
+            // first would corrupt any message that is not valid UTF-8.
+            encodedByHex: isHex(message),
+          })
+        );
+        return extractSignature(result);
+      },
+
+      signTypedData: async (data) => {
+        const result = await runChallenge((session) =>
+          adapter.signTypedData({
+            userToken: session.userToken,
+            walletId: session.walletId!,
+            data,
+          })
+        );
+        return extractSignature(result);
+      },
+
+      sendTransaction: async (tx) => {
+        const to = tx.to as string | undefined;
+        if (!to) {
+          // Circle's contract-execution endpoint requires a destination, so a
+          // bare contract deployment has nowhere to go.
+          throw new Error(
+            'Circle wallets cannot deploy contracts: a transaction must have a `to` address.'
+          );
+        }
+
+        const result = await runChallenge((session) =>
+          adapter.createTransaction({
+            userToken: session.userToken,
+            walletId: session.walletId!,
+            destinationAddress: to,
+            callData: (tx.data as string | undefined) || undefined,
+            // viem sends `value` as wei; Circle expects the native amount in
+            // whole units. Skipping this conversion would overpay by 10^18.
+            amount: tx.value
+              ? formatEther(BigInt(tx.value as string | number | bigint))
+              : undefined,
+            feeLevel: circle.feeLevel ?? 'MEDIUM',
+          })
+        );
+
+        // Note: any explicit gas/maxFeePerGas the caller set is dropped. Circle
+        // prices its own transactions via fee level and rejects raw gas fields.
+        return extractTxHash(result);
+      },
     });
 
     const accountsFrom = (session: CircleSession | null): readonly Address[] =>

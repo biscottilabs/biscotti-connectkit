@@ -34,7 +34,14 @@ export {
   CIRCLE_DEFAULT_BASE_PATH,
 } from './backend';
 
-export { loadCircleSdk, getCircleSdk, resetCircleSdk, executeChallenge } from './sdk';
+export {
+  loadCircleSdk,
+  getCircleSdk,
+  resetCircleSdk,
+  executeChallenge,
+  extractSignature,
+  extractTxHash,
+} from './sdk';
 export type { CircleSdk, CircleChallengeResult } from './sdk';
 
 export {
