@@ -9,6 +9,13 @@ export const config = createConfig(
     appName: 'ConnectKit Next.js demo',
     chains: [mainnet, polygon, optimism, arbitrum, baseSepolia],
     walletConnectProjectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID!,
+    // Declared once. The connector carries these options, so ConnectKitProvider
+    // reads them back without needing a second copy.
+    circle: {
+      appId: process.env.NEXT_PUBLIC_CIRCLE_APP_ID,
+      google: { clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID },
+      defaultChainId: baseSepolia.id,
+    },
   })
 );
 

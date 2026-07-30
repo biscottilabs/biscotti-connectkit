@@ -7,6 +7,9 @@ import {
   safe,
 } from '@wagmi/connectors';
 
+import { circleConnector } from './circle/connector';
+import { isCircleEnabled, type CircleOptions } from './circle/types';
+
 type DefaultConnectorsProps = {
   app: {
     name: string;
@@ -16,18 +19,27 @@ type DefaultConnectorsProps = {
   };
   walletConnectProjectId?: string;
   coinbaseWalletPreference?: CoinbaseWalletParameters<'4'>['preference'];
+  circle?: CircleOptions;
 };
 
 const defaultConnectors = ({
   app,
   walletConnectProjectId,
   coinbaseWalletPreference,
+  circle,
 }: DefaultConnectorsProps): CreateConnectorFn[] => {
   const hasAllAppData = app.name && app.icon && app.description && app.url;
   const shouldUseSafeConnector =
     !(typeof window === 'undefined') && window?.parent !== window;
 
   const connectors: CreateConnectorFn[] = [];
+
+  // Circle goes first so "Sign in with Circle" heads the wallet list — it is the
+  // option for people who do not have a wallet yet, so burying it below the
+  // extensions would defeat the point.
+  if (isCircleEnabled(circle)) {
+    connectors.push(circleConnector({ circle: circle! }));
+  }
 
   // If we're in an iframe, include the SafeConnector
   if (shouldUseSafeConnector) {

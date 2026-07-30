@@ -4,6 +4,7 @@ import { mainnet, polygon, optimism, arbitrum } from 'wagmi/chains';
 import { CoinbaseWalletParameters } from 'wagmi/connectors';
 
 import defaultConnectors from './defaultConnectors';
+import type { CircleOptions } from './circle/types';
 
 // TODO: Move these to a provider rather than global variable
 let globalAppName: string;
@@ -21,6 +22,9 @@ type DefaultConfigProps = {
   walletConnectProjectId: string;
   // Coinbase Wallet preference
   coinbaseWalletPreference?: CoinbaseWalletParameters<'4'>['preference'];
+  // Sign in with Circle. Declaring it here is enough: the connector carries its
+  // own options, so ConnectKitProvider picks them up without a second copy.
+  circle?: CircleOptions;
 } & Partial<CreateConfigParameters>;
 
 const defaultConfig = ({
@@ -30,6 +34,7 @@ const defaultConfig = ({
   appUrl,
   walletConnectProjectId,
   coinbaseWalletPreference,
+  circle,
   chains = [mainnet, polygon, optimism, arbitrum],
   client,
   ...props
@@ -53,6 +58,7 @@ const defaultConfig = ({
       },
       walletConnectProjectId,
       coinbaseWalletPreference,
+      circle,
     });
 
   const config: CreateConfigParameters<any, any> = {

@@ -13,6 +13,7 @@ import {
 import { clearSession, readSession, type CircleSession } from './session';
 import { resetCircleSdk } from './sdk';
 import { isCircleEnabled, type CircleConfigIssue, type CircleWallet } from './types';
+import { useCircleOptions } from './useCircleOptions';
 
 export type CircleLoginStatus =
   | 'disabled'
@@ -51,7 +52,7 @@ export type UseCircleLoginResult = {
 export const useCircleLogin = (): UseCircleLoginResult => {
   const context = useContext();
   const chainIdFromWagmi = useChainId();
-  const circle = context.options?.circle;
+  const circle = useCircleOptions();
   const enabled = isCircleEnabled(circle);
   const chainId = circle?.defaultChainId ?? chainIdFromWagmi;
 

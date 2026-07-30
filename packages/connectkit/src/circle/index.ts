@@ -51,5 +51,16 @@ export {
 } from './session';
 export type { CircleSession } from './session';
 
+export { circleConnector, CIRCLE_CONNECTOR_ID } from './connector';
+export type { CircleConnectorParameters } from './connector';
+
+export {
+  createCircleProvider,
+  CircleMethodNotSupportedError,
+  CircleNotConnectedError,
+} from './provider';
+export type { CircleProvider } from './provider';
+
+export { useCircleOptions } from './useCircleOptions';
 export { useCircleLogin } from './useCircleLogin';
 export type { CircleLoginStatus, UseCircleLoginResult } from './useCircleLogin';
