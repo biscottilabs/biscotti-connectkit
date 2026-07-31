@@ -1,7 +1,7 @@
 'use client';
 
 import { useAccount, useConnect, useDisconnect } from 'wagmi';
-import { ConnectKitButton } from 'biscotti-finance-connectkit';
+import { ConnectKitButton } from '@biscottidex/connectkit';
 import { CirclePanel } from './circle-panel';
 
 function App() {

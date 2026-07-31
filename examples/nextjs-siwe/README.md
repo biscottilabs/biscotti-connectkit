@@ -1,8 +1,8 @@
 # [Next.js](https://nextjs.org/) + [TypeScript](https://www.typescriptlang.org/) + [SIWE](https://login.xyz/) + Biscotti Finance ConnectKit Example
 
-A simple example of implementing `biscotti-finance-connectkit` with [Next.js](https://nextjs.org/) and [Sign-In with Ethereum](https://login.xyz/) in TypeScript.
+A simple example of implementing `@biscottidex/connectkit` with [Next.js](https://nextjs.org/) and [Sign-In with Ethereum](https://login.xyz/) in TypeScript.
 
-See the [`biscotti-finance-connectkit-next-siwe` README](../../packages/connectkit-next-siwe/README.md) for the client/server entry points this example uses. Upstream ConnectKit's [SIWE documentation](https://docs.family.co/connectkit/auth-with-nextjs) still describes the underlying API, which is unchanged apart from the split imports.
+See the [`@biscottidex/connectkit-next-siwe` README](../../packages/connectkit-next-siwe/README.md) for the client/server entry points this example uses. Upstream ConnectKit's [SIWE documentation](https://docs.family.co/connectkit/auth-with-nextjs) still describes the underlying API, which is unchanged apart from the split imports.
 
 ## Running the example
 

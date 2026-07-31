@@ -177,6 +177,35 @@ export const looksLikeOAuthReturn = (): boolean => {
   return /[?&#](code|state|id_token)=/.test(haystack);
 };
 
+/**
+ * Lets the provider mount Circle immediately after a full-page redirect.
+ * Requiring both the SDK callback values and our pending record prevents an
+ * unrelated OAuth callback elsewhere in the host app from opening ConnectKit.
+ */
+export const shouldResumeGoogleLogin = (): boolean =>
+  readPendingLogin() !== null && looksLikeOAuthReturn();
+
+const clearOAuthReturnFromAddressBar = () => {
+  if (typeof window === 'undefined') return;
+
+  const callbackValues = `${window.location.search}${window.location.hash}`;
+  if (
+    !/(?:^|[?#&])(access_token|code|id_token|state|error)=/i.test(
+      callbackValues
+    )
+  ) {
+    return;
+  }
+
+  // Circle has consumed the callback by this point. Do not leave bearer tokens
+  // in copied URLs, screenshots, browser history, or subsequent navigation.
+  window.history.replaceState(
+    window.history.state,
+    document.title,
+    window.location.pathname
+  );
+};
+
 const LOGIN_CALLBACK_TIMEOUT_MS = 45_000;
 
 /**
@@ -210,6 +239,7 @@ export const resumeGoogleLogin = async (
     getCircleSdk(configs, (error, loginResult) => {
       clearTimeout(timer);
       clearPendingLogin();
+      clearOAuthReturnFromAddressBar();
 
       if (error) {
         reject(

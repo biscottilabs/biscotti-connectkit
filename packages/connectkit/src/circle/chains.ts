@@ -3,8 +3,8 @@
  * id, so every call that crosses the Circle API boundary needs a translation in
  * one direction or the other:
  *
- *  - outbound: wagmi gives us a numeric `chainId`, Circle wants `"BASE-SEPOLIA"`
- *  - inbound:  `listWallets` returns `"BASE-SEPOLIA"`, wagmi wants `84532`
+ *  - outbound: wagmi gives us a numeric `chainId`, Circle wants `"ARC-TESTNET"`
+ *  - inbound:  `listWallets` returns `"ARC-TESTNET"`, wagmi wants `5042002`
  *
  * Only EVM chains are mapped. Circle also supports Solana, NEAR and Aptos, but
  * those cannot back an EIP-1193 provider and are therefore out of scope for the
@@ -24,14 +24,15 @@ export type CircleBlockchain =
   | 'OP'
   | 'OP-SEPOLIA'
   | 'UNI'
-  | 'UNI-SEPOLIA';
+  | 'UNI-SEPOLIA'
+  | 'ARC-TESTNET';
 
 /**
  * Chains whose Circle identifier and EIP-155 id we have both verified. Circle
- * additionally exposes `MONAD`, `ARC-TESTNET` and the generic `EVM` /
- * `EVM-TESTNET` buckets; those are deliberately absent rather than guessed at,
- * because a wrong chain id here routes a signature request at the wrong network.
- * Use `circle.chains` in ConnectKitOptions to add them once confirmed.
+ * additionally exposes `MONAD` and the generic `EVM` / `EVM-TESTNET` buckets;
+ * those are deliberately absent rather than guessed at, because a wrong chain
+ * id here routes a signature request at the wrong network. Use `circle.chains`
+ * in ConnectKitOptions to add them once confirmed.
  */
 export const circleChainsByChainId: Record<number, CircleBlockchain> = {
   1: 'ETH',
@@ -44,6 +45,7 @@ export const circleChainsByChainId: Record<number, CircleBlockchain> = {
   421614: 'ARB-SEPOLIA',
   8453: 'BASE',
   84532: 'BASE-SEPOLIA',
+  5042002: 'ARC-TESTNET',
   10: 'OP',
   11155420: 'OP-SEPOLIA',
   130: 'UNI',

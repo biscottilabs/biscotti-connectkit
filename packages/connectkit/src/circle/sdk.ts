@@ -68,10 +68,16 @@ export const loadCircleSdk = (): Promise<CircleSdkModule> => {
         // Reset so a later attempt can retry — a failed chunk fetch should not
         // permanently poison the integration.
         modulePromise = null;
+        const originalMessage =
+          error instanceof Error ? error.message : String(error);
+        const packageIsMissing =
+          /cannot find (?:package|module)|failed to resolve import|module not found/i.test(
+            originalMessage
+          );
         throw new Error(
-          `Could not load "@circle-fin/w3s-pw-web-sdk". Install it to use Sign in with Circle:\n  npm install @circle-fin/w3s-pw-web-sdk\n\nOriginal error: ${
-            error instanceof Error ? error.message : String(error)
-          }`
+          packageIsMissing
+            ? `Could not find "@circle-fin/w3s-pw-web-sdk". Install it to use Sign in with Circle:\n  npm install @circle-fin/w3s-pw-web-sdk\n\nOriginal error: ${originalMessage}`
+            : `Circle's Web SDK is installed but failed to initialize. If this app uses Vite, enable Node browser polyfills as documented by Circle (for example, vite-plugin-node-polyfills).\n\nOriginal error: ${originalMessage}`
         );
       });
   }

@@ -38,7 +38,15 @@ Email OTP setup:
 - Configure an SMTP provider there. For sandbox testing Circle documents
   Mailtrap; use your transactional email provider in production.
 
-Sandbox API keys only work against **testnets**. Point `defaultChainId` at one.
+Circle enforces environment/chain matching: sandbox API keys only work against
+**testnets**, and live API keys only work against **mainnets**. For example,
+pair a sandbox key with `arcTestnet` (`ARC-TESTNET`) or a live key with `base`
+(`BASE`).
+
+When changing environments, discard the previous Circle session and
+reauthenticate. ConnectKit does this automatically when the configured chain no
+longer matches the stored session, preventing a Base wallet from being
+presented as connected in an Arc Testnet app (and vice versa).
 
 ```bash
 # .env.local
@@ -61,7 +69,7 @@ Circle never download it.
 Declare it once, where you build your wagmi config:
 
 ```ts
-import { getDefaultConfig } from 'biscotti-finance-connectkit';
+import { getDefaultConfig } from '@biscottidex/connectkit';
 import { baseSepolia } from 'wagmi/chains';
 
 export const config = createConfig(
@@ -171,16 +179,16 @@ These are properties of Circle's model, not gaps in the integration:
 
 Supported EVM chains are listed in
 [`src/circle/chains.ts`](../packages/connectkit/src/circle/chains.ts). Circle's
-`MONAD`, `ARC-TESTNET` and generic `EVM` buckets are deliberately absent rather
-than guessed; add them with the `chains` option once you have confirmed the
-chain IDs.
+`ARC-TESTNET` is mapped to viem's Arc Testnet chain ID (`5042002`). Circle's
+generic `EVM` buckets remain deliberately absent rather than guessed; add them
+with the `chains` option once you have confirmed the target chain IDs.
 
 ## Headless usage
 
 For a custom UI, skip the modal entirely:
 
 ```tsx
-import { useCircleLogin } from 'biscotti-finance-connectkit';
+import { useCircleLogin } from '@biscottidex/connectkit';
 
 const {
   status,

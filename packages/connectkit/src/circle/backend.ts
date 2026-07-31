@@ -14,12 +14,21 @@ export const CIRCLE_DEFAULT_BASE_PATH = '/api/circle';
 export class CircleBackendError extends Error {
   readonly status: number;
   readonly route: string;
+  readonly code?: string | number;
+  readonly requestId?: string;
 
-  constructor(route: string, status: number, message: string) {
+  constructor(
+    route: string,
+    status: number,
+    message: string,
+    details?: { code?: string | number; requestId?: string }
+  ) {
     super(message);
     this.name = 'CircleBackendError';
     this.route = route;
     this.status = status;
+    this.code = details?.code;
+    this.requestId = details?.requestId;
   }
 }
 
@@ -64,13 +73,35 @@ export const createHttpBackendAdapter = (
     }
 
     if (!response.ok) {
-      const detail = await response.text().catch(() => '');
+      const text = await response.text().catch(() => '');
+      let detail = text.slice(0, 300);
+      let code: string | number | undefined;
+      let requestId: string | undefined;
+      try {
+        const parsed = JSON.parse(text) as {
+          message?: unknown;
+          code?: unknown;
+          requestId?: unknown;
+        };
+        if (typeof parsed.message === 'string') detail = parsed.message;
+        if (typeof parsed.code === 'string' || typeof parsed.code === 'number') {
+          code = parsed.code;
+        }
+        if (typeof parsed.requestId === 'string') requestId = parsed.requestId;
+      } catch {
+        // Preserve a short plain-text response when the backend did not return
+        // JSON. Never echo an unlimited upstream body into the modal.
+      }
+
       throw new CircleBackendError(
         route,
         response.status,
         `${basePath}${route} responded ${response.status}${
-          detail ? `: ${detail.slice(0, 300)}` : ''
-        }`
+          code !== undefined ? ` (${code})` : ''
+        }${detail ? `: ${detail}` : ''}${
+          requestId ? ` [request ${requestId}]` : ''
+        }`,
+        { code, requestId }
       );
     }
 

@@ -107,7 +107,19 @@ export const issuesFromHealth = (
 ): CircleConfigIssue[] => {
   if (!report || report.ok) return [];
 
-  if (!report.missing?.length) {
+  const reported = report.issues ?? [];
+  const missing = (report.missing ?? []).map((item) => ({
+    id: item.id,
+    envVar: item.envVar,
+    scope: item.scope,
+    severity: 'error' as const,
+    message: `${
+      item.envVar ?? item.id
+    } is not set on the server. Add it to your server environment — never to a client-visible variable.`,
+    docsUrl: DOCS.apiKey,
+  }));
+
+  if (reported.length === 0 && missing.length === 0) {
     return [
       {
         id: 'serverUnhealthy',
@@ -120,16 +132,7 @@ export const issuesFromHealth = (
     ];
   }
 
-  return report.missing.map((item) => ({
-    id: item.id,
-    envVar: item.envVar,
-    scope: item.scope,
-    severity: 'error' as const,
-    message: `${
-      item.envVar ?? item.id
-    } is not set on the server. Add it to your server environment — never to a client-visible variable.`,
-    docsUrl: DOCS.apiKey,
-  }));
+  return [...reported, ...missing];
 };
 
 export const hasBlockingIssues = (issues: CircleConfigIssue[]): boolean =>

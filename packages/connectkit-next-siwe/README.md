@@ -1,13 +1,13 @@
-# biscotti-finance-connectkit-next-siwe
+# @biscottidex/connectkit-next-siwe
 
-A simple solution for integrating [Sign In With Ethereum](https://login.xyz), a secure [authentication standard](https://docs.login.xyz/general-information/siwe-overview/eip-4361), into your Next.js app using [`biscotti-finance-connectkit`](https://github.com/biscottilabs/biscotti-connectkit).
+A simple solution for integrating [Sign In With Ethereum](https://login.xyz), a secure [authentication standard](https://docs.login.xyz/general-information/siwe-overview/eip-4361), into your Next.js app using [`@biscottidex/connectkit`](https://github.com/biscottilabs/biscotti-connectkit).
 
 ## 1. Install
 
-Once you've set up `biscotti-finance-connectkit`, install the official [Sign In With Ethereum package](https://www.npmjs.com/package/siwe) and this SIWE helper package:
+Once you've set up `@biscottidex/connectkit`, install the SIWE helper:
 
 ```sh
-bun add siwe biscotti-finance-connectkit-next-siwe
+bun add @biscottidex/connectkit-next-siwe
 ```
 
 ## 2. Configure
@@ -15,18 +15,18 @@ bun add siwe biscotti-finance-connectkit-next-siwe
 Import browser-safe configuration from the client entry point:
 
 ```ts
-import { configureClientSIWE } from 'biscotti-finance-connectkit-next-siwe/client';
+import { configureClientSIWE } from '@biscottidex/connectkit-next-siwe/client';
 ```
 
 Import API-route and session configuration only from the server entry point:
 
 ```ts
-import { configureServerSideSIWE } from 'biscotti-finance-connectkit-next-siwe/server';
+import { configureServerSideSIWE } from '@biscottidex/connectkit-next-siwe/server';
 ```
 
 Keeping these entry points separate prevents `iron-session` and Node.js built-ins from entering
 the browser bundle. There is no root export — importing from
-`biscotti-finance-connectkit-next-siwe` directly will fail. See
+`@biscottidex/connectkit-next-siwe` directly will fail. See
 [CHANGELOG.md](CHANGELOG.md) for the migration note.
 
 `configureServerSideSIWE` requires a session password of at least 32 characters,

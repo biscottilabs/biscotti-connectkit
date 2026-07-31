@@ -1,4 +1,4 @@
-import { configureClientSIWE } from 'biscotti-finance-connectkit-next-siwe/client';
+import { configureClientSIWE } from '@biscottidex/connectkit-next-siwe/client';
 
 export const siweClient = configureClientSIWE({
   apiRoutePrefix: '/api/siwe',

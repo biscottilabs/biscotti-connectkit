@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useCircleLogin } from 'biscotti-finance-connectkit';
+import { useCircleLogin } from '@biscottidex/connectkit';
 
 /**
  * Headless example for developers building their own Circle authentication UI.

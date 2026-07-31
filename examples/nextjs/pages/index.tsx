@@ -1,5 +1,5 @@
 import type { NextPage } from 'next';
-import { ConnectKitButton } from 'biscotti-finance-connectkit';
+import { ConnectKitButton } from '@biscottidex/connectkit';
 
 const Home: NextPage = () => {
   return (

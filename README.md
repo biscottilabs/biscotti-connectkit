@@ -1,6 +1,6 @@
 # Biscotti Finance ConnectKit
 
-`biscotti-finance-connectkit` is a [React](https://reactjs.org/) component library for connecting a wallet to your dApp. It supports the most popular connectors and chains out of the box and provides a beautiful, seamless experience.
+`@biscottidex/connectkit` is a [React](https://reactjs.org/) component library for connecting a wallet to your dApp. It supports the most popular connectors and chains out of the box and provides a beautiful, seamless experience.
 
 ## Features
 
@@ -14,19 +14,19 @@ and much more...
 ## Installation
 
 ```sh
-bun add biscotti-finance-connectkit wagmi viem @tanstack/react-query
+bun add @biscottidex/connectkit wagmi viem @tanstack/react-query
 ```
 
 For Sign-In with Ethereum in a Next.js app, also install:
 
 ```sh
-bun add biscotti-finance-connectkit-next-siwe
+bun add @biscottidex/connectkit-next-siwe
 ```
 
 ## Usage
 
 ```tsx
-import { ConnectKitProvider, ConnectKitButton, getDefaultConfig } from 'biscotti-finance-connectkit';
+import { ConnectKitProvider, ConnectKitButton, getDefaultConfig } from '@biscottidex/connectkit';
 ```
 
 Wallet connectors provided by default are MetaMask (and other injected
@@ -39,14 +39,14 @@ an iframe.
 
 | Package | Description |
 | --- | --- |
-| [`biscotti-finance-connectkit`](packages/connectkit) | The wallet connection component library |
-| [`biscotti-finance-connectkit-next-siwe`](packages/connectkit-next-siwe) | Sign-In with Ethereum helpers for Next.js |
+| [`@biscottidex/connectkit`](packages/connectkit) | The wallet connection component library |
+| [`@biscottidex/connectkit-next-siwe`](packages/connectkit-next-siwe) | Sign-In with Ethereum helpers for Next.js |
 
 The SIWE package exposes separate client and server entry points:
 
 ```ts
-import { configureClientSIWE } from 'biscotti-finance-connectkit-next-siwe/client';
-import { configureServerSideSIWE } from 'biscotti-finance-connectkit-next-siwe/server';
+import { configureClientSIWE } from '@biscottidex/connectkit-next-siwe/client';
+import { configureServerSideSIWE } from '@biscottidex/connectkit-next-siwe/server';
 ```
 
 ## Examples
@@ -98,7 +98,7 @@ Before starting on anything, please have a read through the
 
 ## Acknowledgements
 
-`biscotti-finance-connectkit` is a fork of
+`@biscottidex/connectkit` is a fork of
 [**ConnectKit**](https://github.com/family/connectkit), created by
 **Family (LFE, Inc.)** and used under the BSD 2-Clause License. The original
 project remains the source of the great majority of this codebase, and full

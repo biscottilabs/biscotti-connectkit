@@ -5,7 +5,7 @@ import { type ReactNode } from 'react';
 import { WagmiProvider } from 'wagmi';
 
 import { config } from '../config';
-import { ConnectKitProvider } from 'biscotti-finance-connectkit';
+import { ConnectKitProvider } from '@biscottidex/connectkit';
 
 const queryClient = new QueryClient();
 export function Providers(props: { children: ReactNode }) {

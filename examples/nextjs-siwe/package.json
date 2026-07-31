@@ -10,16 +10,16 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.17.15",
-    "@wagmi/connectors": "5.7.7",
-    "@wagmi/core": "2.16.4",
-    "biscotti-finance-connectkit": "workspace:packages/connectkit",
-    "biscotti-finance-connectkit-next-siwe": "workspace:packages/connectkit-next-siwe",
+    "@wagmi/connectors": "5.10.0",
+    "@wagmi/core": "2.21.0",
+    "@biscottidex/connectkit": "workspace:packages/connectkit",
+    "@biscottidex/connectkit-next-siwe": "workspace:packages/connectkit-next-siwe",
     "next": "15.5.14",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
     "siwe": "^2.1.4",
-    "viem": "^2.23.2",
-    "wagmi": "^2.14.11"
+    "viem": "^2.55.10",
+    "wagmi": "^2.17.0"
   },
   "devDependencies": {
     "@types/node": "18.7.18",

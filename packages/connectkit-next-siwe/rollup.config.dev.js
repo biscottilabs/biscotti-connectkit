@@ -7,7 +7,7 @@ export default [
   {
     input: './src/client.tsx',
     external: [
-      'connectkit',
+      '@biscottidex/connectkit',
       'react',
       'react-dom',
       'react/jsx-runtime',

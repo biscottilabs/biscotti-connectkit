@@ -1,36 +1,12 @@
-# 0.4.0
+# 0.0.1
 
-**Breaking.** This package is now split into separate client and server entry points. The
-root import (`connectkit-next-siwe`) has been removed.
+Initial release under the `@biscottidex` scope.
 
-Previously both `configureClientSIWE` and `configureServerSideSIWE` were exported from a single
-module. Because `iron-session`, `next`, and `node:http` were imported at the top level of that
-module, importing *anything* from the package pulled server-only code into the browser bundle —
-which broke client builds with `Module not found: node:process` via `@peculiar/webcrypto`.
-
-## Breaking
-
-- Removed the root export. Update your imports:
-
-  ```diff
-  - import { configureClientSIWE } from 'connectkit-next-siwe';
-  + import { configureClientSIWE } from 'connectkit-next-siwe/client';
-
-  - import { configureServerSideSIWE } from 'connectkit-next-siwe';
-  + import { configureServerSideSIWE } from 'connectkit-next-siwe/server';
-  ```
-
-  There is no other change to either function's signature or behaviour.
-
-## Fixed
-
-- Server-only dependencies (`iron-session`, `next`, `node:http`) no longer reach the client
-  bundle. `connectkit-next-siwe/client` now resolves to `react/jsx-runtime`, `connectkit`, and
-  `viem/siwe` only.
-
-## Updated
-
-- `viem` is now a peer dependency only. It was previously declared as both a direct and a peer
-  dependency, which could resolve two copies of viem in a consuming app.
-- Added `"sideEffects": false` so bundlers can tree-shake the package.
-- Build output directory is now cleaned before each build, so stale artifacts are never published.
+- Provides the browser-safe
+  `@biscottidex/connectkit-next-siwe/client` entry point.
+- Provides the server-only
+  `@biscottidex/connectkit-next-siwe/server` entry point.
+- Uses `viem/siwe` for message creation, parsing and verification.
+- Keeps `iron-session`, Next.js and Node.js built-ins out of browser bundles.
+- Declares viem and `@biscottidex/connectkit` as peer dependencies.
+- Cleans build output before every release and supports tree-shaking.

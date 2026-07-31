@@ -1,4 +1,4 @@
-# 2.0.0
+# 0.0.1
 
 This is the first release under the Biscotti Finance name. The package is a fork of
 [ConnectKit](https://github.com/family/connectkit) by Family (LFE, Inc.), used under the
@@ -8,8 +8,8 @@ changelog, kept for reference.
 ## Breaking
 
 - Renamed the packages:
-  - `connectkit` → `biscotti-finance-connectkit`
-  - `connectkit-next-siwe` → `biscotti-finance-connectkit-next-siwe`
+  - `connectkit` → `@biscottidex/connectkit`
+  - `connectkit-next-siwe` → `@biscottidex/connectkit-next-siwe`
 
   Update your imports accordingly. The exported React API is unchanged —
   `ConnectKitProvider`, `ConnectKitButton`, `getDefaultConfig` and friends keep their

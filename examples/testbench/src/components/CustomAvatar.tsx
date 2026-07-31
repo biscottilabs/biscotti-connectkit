@@ -1,4 +1,4 @@
-import { Types } from 'biscotti-finance-connectkit';
+import { Types } from '@biscottidex/connectkit';
 
 import { motion } from 'framer-motion';
 

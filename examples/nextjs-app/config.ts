@@ -1,4 +1,4 @@
-import { getDefaultConfig } from 'biscotti-finance-connectkit';
+import { getDefaultConfig } from '@biscottidex/connectkit';
 import { createConfig } from 'wagmi';
 import { mainnet, polygon, optimism, arbitrum, baseSepolia } from 'wagmi/chains';
 

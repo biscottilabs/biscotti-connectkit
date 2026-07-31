@@ -8,6 +8,8 @@ export default defineConfig(({ mode }) => {
   // Passing an empty prefix loads the server-only CIRCLE_API_KEY too. Only the
   // VITE_* subset is exposed to browser code by Vite.
   const env = loadEnv(mode, process.cwd(), '')
+  const circleEnvironment =
+    env.VITE_CIRCLE_ENVIRONMENT === 'live' ? 'live' : 'sandbox'
 
   return {
     // OAuth redirect URIs must match exactly. Fail instead of silently moving
@@ -43,7 +45,9 @@ export default defineConfig(({ mode }) => {
       nodePolyfills(),
       react(),
       circleDevServer({
-        apiKey: env.CIRCLE_API_KEY
+        apiKey: env.CIRCLE_API_KEY,
+        environment: circleEnvironment,
+        configuredEnvironment: env.VITE_CIRCLE_ENVIRONMENT
       })
     ]
   }

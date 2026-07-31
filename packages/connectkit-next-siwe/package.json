@@ -1,10 +1,13 @@
 {
-  "name": "biscotti-finance-connectkit-next-siwe",
-  "version": "0.4.0",
+  "name": "@biscottidex/connectkit-next-siwe",
+  "version": "0.0.1",
   "author": "Biscotti Finance",
   "homepage": "https://github.com/biscottilabs/biscotti-connectkit",
   "license": "BSD-2-Clause",
-  "description": "Connecting a wallet, made simple.",
+  "publishConfig": {
+    "access": "public"
+  },
+  "description": "Sign-In with Ethereum helpers for Next.js apps using @biscottidex/connectkit.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/biscottilabs/biscotti-connectkit.git",
@@ -61,14 +64,14 @@
     "iron-session": "^6.2.1"
   },
   "peerDependencies": {
-    "biscotti-finance-connectkit": ">=1.2.0",
+    "@biscottidex/connectkit": ">=0.0.1",
     "next": ">=12.x",
     "react": "17.x || 18.x",
     "react-dom": "17.x || 18.x",
     "viem": ">=2.13.3"
   },
   "devDependencies": {
-    "biscotti-finance-connectkit": "workspace:packages/connectkit",
+    "@biscottidex/connectkit": "workspace:packages/connectkit",
     "@types/node": "^16.11.27",
     "@types/react": "^18.0.6",
     "@types/react-dom": "^18.0.2",

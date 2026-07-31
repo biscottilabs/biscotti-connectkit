@@ -6,15 +6,88 @@ const ROUTE_PREFIX = '/api/circle';
 
 type CircleDevServerOptions = {
   apiKey?: string;
+  environment: 'sandbox' | 'live';
+  configuredEnvironment?: string;
 };
 
 type JsonObject = Record<string, unknown>;
+type CircleConfigurationIssue = {
+  id: string;
+  envVar?: string;
+  scope: 'client' | 'server';
+  severity: 'error';
+  message: string;
+  docsUrl: string;
+};
 
 class HttpError extends Error {
-  constructor(readonly status: number, message: string) {
+  constructor(
+    readonly status: number,
+    message: string,
+    readonly code?: string | number,
+    readonly requestId?: string
+  ) {
     super(message);
   }
 }
+
+const apiKeyEnvironment = (
+  apiKey: string | undefined
+): 'sandbox' | 'live' | undefined =>
+  apiKey?.startsWith('LIVE_API_KEY:')
+    ? 'live'
+    : apiKey?.startsWith('TEST_API_KEY:')
+    ? 'sandbox'
+    : undefined;
+
+const configurationIssues = ({
+  apiKey,
+  environment,
+  configuredEnvironment,
+}: CircleDevServerOptions): CircleConfigurationIssue[] => {
+  const docsUrl =
+    'https://developers.circle.com/wallets/supported-blockchains';
+  const issues: CircleConfigurationIssue[] = [];
+
+  if (
+    configuredEnvironment &&
+    configuredEnvironment !== 'sandbox' &&
+    configuredEnvironment !== 'live'
+  ) {
+    issues.push({
+      id: 'invalidCircleEnvironment',
+      envVar: 'VITE_CIRCLE_ENVIRONMENT',
+      scope: 'client',
+      severity: 'error',
+      message:
+        'VITE_CIRCLE_ENVIRONMENT must be exactly "sandbox" or "live". Sandbox uses Arc Testnet; live uses Base mainnet.',
+      docsUrl,
+    });
+  }
+
+  const detected = apiKeyEnvironment(apiKey);
+  if (apiKey && !detected) {
+    issues.push({
+      id: 'unrecognizedCircleApiKey',
+      envVar: 'CIRCLE_API_KEY',
+      scope: 'server',
+      severity: 'error',
+      message:
+        'CIRCLE_API_KEY is not a recognized TEST_API_KEY or LIVE_API_KEY. Copy a Wallets API key from Circle Console without quotes or whitespace.',
+      docsUrl,
+    });
+  } else if (detected && detected !== environment) {
+    issues.push({
+      id: 'circleEnvironmentMismatch',
+      scope: 'server',
+      severity: 'error',
+      message: `Circle is configured for ${environment}, but CIRCLE_API_KEY is a ${detected} key. Use TEST_API_KEY with Arc Testnet or LIVE_API_KEY with Base mainnet.`,
+      docsUrl,
+    });
+  }
+
+  return issues;
+};
 
 const readJson = async (request: IncomingMessage): Promise<JsonObject> => {
   const chunks: Buffer[] = [];
@@ -57,7 +130,11 @@ const unwrap = <T>(value: { data: T }): T => value.data;
  * VITE_* values are intentionally used only for public browser configuration.
  * CIRCLE_API_KEY has no VITE_ prefix and is read by this Node process only.
  */
-export const circleDevServer = ({ apiKey }: CircleDevServerOptions): Plugin => ({
+export const circleDevServer = ({
+  apiKey,
+  environment,
+  configuredEnvironment,
+}: CircleDevServerOptions): Plugin => ({
   name: 'circle-dev-server',
   apply: 'serve',
   configureServer(server) {
@@ -79,7 +156,17 @@ export const circleDevServer = ({ apiKey }: CircleDevServerOptions): Plugin => (
           },
         ].filter(Boolean);
 
-        sendJson(response, 200, { ok: missing.length === 0, missing });
+        const issues = configurationIssues({
+          apiKey,
+          environment,
+          configuredEnvironment,
+        });
+
+        sendJson(response, 200, {
+          ok: missing.length === 0 && issues.length === 0,
+          missing,
+          issues,
+        });
         return;
       }
 
@@ -87,6 +174,19 @@ export const circleDevServer = ({ apiKey }: CircleDevServerOptions): Plugin => (
         sendJson(response, 500, {
           message:
             'CIRCLE_API_KEY is not set. Add it to examples/vite/.env.local without a VITE_ prefix.',
+        });
+        return;
+      }
+
+      const environmentIssues = configurationIssues({
+        apiKey,
+        environment,
+        configuredEnvironment,
+      });
+      if (environmentIssues.length > 0) {
+        sendJson(response, 500, {
+          code: 'CIRCLE_CONFIGURATION_ERROR',
+          message: environmentIssues[0].message,
         });
         return;
       }
@@ -171,27 +271,46 @@ export const circleDevServer = ({ apiKey }: CircleDevServerOptions): Plugin => (
           throw new HttpError(400, 'Missing `userToken` in request body.');
         }
 
+        const requestId = crypto.randomUUID();
         const circleResponse = await fetch(`${CIRCLE_API_BASE}${circlePath}`, {
           method,
           headers: {
             Authorization: `Bearer ${apiKey}`,
             'Content-Type': 'application/json',
-            'X-Request-Id': crypto.randomUUID(),
+            'X-Request-Id': requestId,
             ...(userToken ? { 'X-User-Token': userToken } : {}),
           },
           body: circleBody ? JSON.stringify(circleBody) : undefined,
         });
         const text = await circleResponse.text();
-        const result = text ? JSON.parse(text) : {};
+        let result: JsonObject = {};
+        if (text) {
+          try {
+            result = JSON.parse(text) as JsonObject;
+          } catch {
+            throw new HttpError(
+              circleResponse.ok ? 502 : circleResponse.status,
+              'Circle returned a non-JSON response.',
+              'CIRCLE_INVALID_RESPONSE',
+              requestId
+            );
+          }
+        }
 
         if (!circleResponse.ok) {
           throw new HttpError(
             circleResponse.status,
-            result?.message ?? circleResponse.statusText
+            typeof result.message === 'string'
+              ? result.message
+              : circleResponse.statusText,
+            typeof result.code === 'string' || typeof result.code === 'number'
+              ? result.code
+              : undefined,
+            requestId
           );
         }
 
-        const data = unwrap(result);
+        const data = unwrap(result as { data: unknown });
         if (route === '/device-token' || route === '/email-otp') {
           sendJson(response, 200, data);
         } else if (route === '/wallets') {
@@ -205,7 +324,11 @@ export const circleDevServer = ({ apiKey }: CircleDevServerOptions): Plugin => (
         }
       } catch (error) {
         if (error instanceof HttpError) {
-          sendJson(response, error.status, { message: error.message });
+          sendJson(response, error.status, {
+            message: error.message,
+            ...(error.code !== undefined ? { code: error.code } : {}),
+            ...(error.requestId ? { requestId: error.requestId } : {}),
+          });
           return;
         }
 

@@ -148,12 +148,25 @@ export const circleConnector = ({ circle }: CircleConnectorParameters) =>
       type: CIRCLE_CONNECTOR_ID,
       circleOptions: circle,
 
-      async connect({ chainId } = {}) {
+      async connect<withCapabilities extends boolean = false>({
+        chainId,
+        withCapabilities,
+      }: {
+        chainId?: number;
+        isReconnecting?: boolean;
+        withCapabilities?: withCapabilities | boolean;
+      } = {}) {
         const session = readSession();
 
         if (session?.address && session.walletId) {
+          const accounts = accountsFrom(session);
           return {
-            accounts: accountsFrom(session),
+            // wagmi 2.19 added an optional EIP-5792 capability-shaped account
+            // result. Circle does not currently advertise wallet capabilities,
+            // so return an empty capability record when the caller requests it.
+            accounts: (withCapabilities
+              ? accounts.map((address) => ({ address, capabilities: {} }))
+              : accounts) as never,
             chainId: session.chainId ?? fallbackChainId(),
           };
         }

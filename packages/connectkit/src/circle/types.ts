@@ -80,6 +80,8 @@ export type CircleChallengeResponse = {
 export type CircleHealthReport = {
   ok: boolean;
   missing?: Array<{ id: string; envVar?: string; scope: CircleConfigScope }>;
+  /** Detailed safe-to-display configuration failures reported by the server. */
+  issues?: CircleConfigIssue[];
 };
 
 export interface CircleBackendAdapter {

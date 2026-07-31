@@ -1,7 +1,7 @@
 import '@/styles/globals.css';
 import { siweClient } from '@/utils/siweClient';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ConnectKitProvider, getDefaultConfig } from 'biscotti-finance-connectkit';
+import { ConnectKitProvider, getDefaultConfig } from '@biscottidex/connectkit';
 import type { AppProps } from 'next/app';
 import { useState } from 'react';
 import { WagmiProvider, createConfig } from 'wagmi';

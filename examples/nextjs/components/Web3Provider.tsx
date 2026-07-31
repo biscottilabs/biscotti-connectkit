@@ -2,7 +2,7 @@ import React from 'react';
 
 import { WagmiProvider, createConfig } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ConnectKitProvider, getDefaultConfig } from 'biscotti-finance-connectkit';
+import { ConnectKitProvider, getDefaultConfig } from '@biscottidex/connectkit';
 
 const config = createConfig(
   getDefaultConfig({

@@ -1,5 +1,5 @@
-import { useSIWE, useModal } from 'biscotti-finance-connectkit';
-import { SIWESession } from 'biscotti-finance-connectkit';
+import { useSIWE, useModal } from '@biscottidex/connectkit';
+import { SIWESession } from '@biscottidex/connectkit';
 import { useAccount } from 'wagmi';
 
 const CustomSIWEButton = () => {

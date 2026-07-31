@@ -197,6 +197,18 @@ export const useCircleLogin = (): UseCircleLoginResult => {
 
       const stored = readSession();
       if (stored) {
+        // A Circle token and wallet belong to the environment/chain they were
+        // created for. Never present a stale Base mainnet wallet as connected
+        // after the app switches to Arc Testnet (or vice versa).
+        if (stored.chainId !== undefined && stored.chainId !== chainId) {
+          clearSession();
+          resetCircleSdk();
+          setSession(null);
+          setWallet(null);
+          setStatus('ready');
+          return;
+        }
+
         setSession(stored);
         setWallet(
           stored.walletId && stored.address

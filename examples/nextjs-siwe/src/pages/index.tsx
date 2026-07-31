@@ -1,4 +1,4 @@
-import { ConnectKitButton, useSIWE } from 'biscotti-finance-connectkit';
+import { ConnectKitButton, useSIWE } from '@biscottidex/connectkit';
 
 export default function Home({ address }: { address?: string }) {
   const { data, isSignedIn, signOut, signIn } = useSIWE();
