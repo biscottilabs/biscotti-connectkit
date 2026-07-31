@@ -1,7 +1,9 @@
 import '@/styles/globals.css';
 import { siweClient } from '@/utils/siweClient';
-import { ConnectKitProvider, getDefaultConfig } from 'connectkit';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ConnectKitProvider, getDefaultConfig } from '@biscottidex/connectkit';
 import type { AppProps } from 'next/app';
+import { useState } from 'react';
 import { WagmiProvider, createConfig } from 'wagmi';
 
 const config = createConfig(
@@ -12,13 +14,17 @@ const config = createConfig(
 );
 
 export default function App({ Component, pageProps }: AppProps) {
+  const [queryClient] = useState(() => new QueryClient());
+
   return (
     <WagmiProvider config={config}>
-      <siweClient.Provider>
-        <ConnectKitProvider>
-          <Component {...pageProps} />
-        </ConnectKitProvider>
-      </siweClient.Provider>
+      <QueryClientProvider client={queryClient}>
+        <siweClient.Provider>
+          <ConnectKitProvider>
+            <Component {...pageProps} />
+          </ConnectKitProvider>
+        </siweClient.Provider>
+      </QueryClientProvider>
     </WagmiProvider>
   );
 }

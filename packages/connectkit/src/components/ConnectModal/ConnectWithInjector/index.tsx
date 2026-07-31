@@ -75,7 +75,7 @@ const contentVariants: Variants = {
 const ConnectWithInjector: React.FC<{
   switchConnectMethod: (id?: string) => void;
   forceState?: typeof states;
-}> = ({ switchConnectMethod, forceState }) => {
+}> = ({ forceState }) => {
   const { connect } = useConnect({
     mutation: {
       onMutate: (connector?: any) => {
@@ -118,7 +118,6 @@ const ConnectWithInjector: React.FC<{
               }
             }
           }
-        } else if (data) {
         }
         setTimeout(triggerResize, 100);
       },
@@ -139,8 +138,6 @@ const ConnectWithInjector: React.FC<{
 
   const [showTryAgainTooltip, setShowTryAgainTooltip] = useState(false);
 
-  const expiryDefault = 9; // Starting at 10 causes layout shifting, better to start at 9
-  const [expiryTimer, setExpiryTimer] = useState<number>(expiryDefault);
 
   const browser = detectBrowser();
 

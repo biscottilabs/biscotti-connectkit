@@ -13,8 +13,9 @@ import DownloadApp from '../Pages/DownloadApp';
 import Profile from '../Pages/Profile';
 import SwitchNetworks from '../Pages/SwitchNetworks';
 import SignInWithEthereum from '../Pages/SignInWithEthereum';
+import CircleSignIn from '../Pages/Circle';
 
-import { getAppIcon, getAppName } from '../../defaultConfig';
+import { getAppName } from '../../defaultConfig';
 import { ConnectKitThemeProvider } from '../ConnectKitThemeProvider/ConnectKitThemeProvider';
 import { useChainIsSupported } from '../../hooks/useChainIsSupported';
 
@@ -71,6 +72,7 @@ const ConnectModal: React.FC<{
     profile: <Profile />,
     switchNetworks: <SwitchNetworks />,
     signInWithEthereum: <SignInWithEthereum />,
+    circle: <CircleSignIn />,
   };
 
   function hide() {

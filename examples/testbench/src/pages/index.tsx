@@ -12,7 +12,7 @@ import {
   useChains,
   useModal,
   useSIWE,
-} from 'connectkit';
+} from '@biscottidex/connectkit';
 
 import {
   useAccount,

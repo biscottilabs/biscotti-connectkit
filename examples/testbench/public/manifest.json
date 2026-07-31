@@ -1,9 +1,9 @@
 {
-  "name": "ConnectKit Testbench",
-  "description": "Testbench for ConnectKit",
+  "name": "Biscotti Finance ConnectKit Testbench",
+  "description": "Testbench for Biscotti Finance ConnectKit",
   "iconPath": "app.png",
   "providedBy": {
-    "name": "Aave",
-    "url": "https://aave.com"
+    "name": "Biscotti Finance",
+    "url": "https://github.com/biscottilabs/biscotti-connectkit"
   }
 }

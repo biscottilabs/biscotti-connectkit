@@ -31,7 +31,7 @@ const nFormatter = (num: number, digits: number = 2) => {
   ];
 
   const rx = /\.0+$|(\.[0-9]*[1-9])0+$/;
-  var item = lookup
+  const item = lookup
     .slice()
     .reverse()
     .find(function (item) {
@@ -79,9 +79,6 @@ function flattenChildren(children: React.ReactNode): ReactChildArray {
 
 export const isWalletConnectConnector = (connectorId?: string) =>
   connectorId === 'walletConnect';
-
-export const isAaveAccountConnector = (connectorId?: string) =>
-  connectorId === 'aaveAccountProvider';
 
 export const isMetaMaskConnector = (connectorId?: string) =>
   connectorId === 'metaMaskSDK';

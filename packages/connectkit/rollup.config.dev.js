@@ -7,10 +7,18 @@ const styledComponentsTransformer = createStyledComponentsTransformer({
   displayName: true,
 });
 
+// Kept in sync with rollup.config.prod.js — see the comment there.
+const externalDeps = [
+  ...Object.keys(packageJson.dependencies ?? {}),
+  ...Object.keys(packageJson.peerDependencies ?? {}),
+];
+const external = (id) =>
+  externalDeps.some((dep) => id === dep || id.startsWith(`${dep}/`));
+
 export default [
   {
     input: ['./src/index.ts'],
-    external: ['react', 'react-dom', 'framer-motion', 'wagmi'],
+    external,
     output: [
       {
         file: packageJson.exports.import,
@@ -22,6 +30,7 @@ export default [
       peerDepsExternal(),
       typescript({
         useTsconfigDeclarationDir: true,
+        include: ['**/*.ts', '**/*.tsx'],
         exclude: 'node_modules/**',
         transformers: [
           () => ({

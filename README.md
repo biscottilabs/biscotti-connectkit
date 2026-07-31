@@ -1,10 +1,6 @@
-<a href="https://docs.family.co/connectkit">
-  <img width="1080" alt="connectkit" src="https://github.com/family/connectkit/assets/1930210/87c2e868-3228-44b8-82c3-a38adf6d1bbf">
-</a>
+# Biscotti Finance ConnectKit
 
-# ConnectKit
-
-ConnectKit is a powerful [React](https://reactjs.org/) component library for connecting a wallet to your dApp. It supports the most popular connectors and chains out of the box and provides a beautiful, seamless experience.
+`@biscottidex/connectkit` is a [React](https://reactjs.org/) component library for connecting a wallet to your dApp. It supports the most popular connectors and chains out of the box and provides a beautiful, seamless experience.
 
 ## Features
 
@@ -15,65 +11,107 @@ ConnectKit is a powerful [React](https://reactjs.org/) component library for con
 
 and much more...
 
-## Quick Start
+## Installation
 
-Get started with a ConnectKit + [wagmi](https://wagmi.sh/) + [viem](https://viem.sh) project by following the documentation [here](https://docs.family.co/connectkit/getting-started).
+```sh
+bun add @biscottidex/connectkit wagmi viem @tanstack/react-query
+```
 
-## Documentation
+For Sign-In with Ethereum in a Next.js app, also install:
 
-You can find the full ConnectKit documentation in the docs [here](https://docs.family.co/connectkit).
+```sh
+bun add @biscottidex/connectkit-next-siwe
+```
 
-## API Reference
+## Usage
 
-You can find the full API Reference in the docs [here](https://docs.family.co/connectkit/api-reference).
+```tsx
+import { ConnectKitProvider, ConnectKitButton, getDefaultConfig } from '@biscottidex/connectkit';
+```
+
+Wallet connectors provided by default are MetaMask (and other injected
+wallets), Coinbase Wallet, and WalletConnect. WalletConnect requires a project
+ID — get one free from [Reown Cloud](https://cloud.reown.com) and pass it as
+`walletConnectProjectId`. Safe is added automatically when the dApp runs inside
+an iframe.
+
+## Packages
+
+| Package | Description |
+| --- | --- |
+| [`@biscottidex/connectkit`](packages/connectkit) | The wallet connection component library |
+| [`@biscottidex/connectkit-next-siwe`](packages/connectkit-next-siwe) | Sign-In with Ethereum helpers for Next.js |
+
+The SIWE package exposes separate client and server entry points:
+
+```ts
+import { configureClientSIWE } from '@biscottidex/connectkit-next-siwe/client';
+import { configureServerSideSIWE } from '@biscottidex/connectkit-next-siwe/server';
+```
 
 ## Examples
 
-There are various runnable examples included in this repository in the [examples folder](https://github.com/family/connectkit/tree/main/examples):
+Runnable examples live in the [examples folder](examples):
 
-- [Next.js Example (TypeScript)](https://github.com/family/connectkit/tree/main/examples/nextjs)
-- [Vite Example (TypeScript)](https://github.com/family/connectkit/tree/main/examples/vite)
-
-### Try in CodeSandbox
-
-You can try out some ConnectKit examples directly in your browser through CodeSandbox:
-
-- [Next.js (TypeScript)](https://codesandbox.io/s/qnvyqe?file=/README.md)
-- [Vite Example (TypeScript)](https://codesandbox.io/s/4jtssh?file=/README.md)
+- [Next.js (Pages Router)](examples/nextjs)
+- [Next.js (App Router)](examples/nextjs-app)
+- [Next.js with SIWE](examples/nextjs-siwe)
+- [Vite](examples/vite)
+- [Testbench](examples/testbench) — the widest coverage: chains, themes, iframe, token gating
 
 ### Running Examples Locally
 
-Clone the ConnectKit project and install the necessary dependencies:
+Clone the project and install dependencies:
 
 ```sh
-$ git clone git@github.com:family/connectkit.git
-$ cd connectkit
-$ yarn install
+$ git clone git@github.com:biscottilabs/biscotti-connectkit.git
+$ cd biscotti-connectkit
+$ bun install
 ```
 
-and start the code bundler:
+The examples consume the **built** library output, so start the bundler in
+watch mode first — otherwise changes to library source will not appear:
 
 ```sh
-$ yarn dev:connectkit
-$ yarn dev:connectkit-next-siwe
+$ bun run dev:connectkit
+$ bun run dev:connectkit-next-siwe
 ```
 
-and then simply select the example you'd like to run:
+Then select the example you'd like to run:
 
 ```sh
-$ yarn dev:vite # Vite
-$ yarn dev:nextjs # Next.js
-$ yarn dev:nextjs-siwe # Next.js with SIWE
+$ bun run dev:vite # Vite
+$ bun run dev:nextjs # Next.js
+$ bun run dev:nextjs-siwe # Next.js with SIWE
+$ bun run dev:testbench # Testbench (also serves https on :3001)
 ```
+
+Copy each example's `.env.example` to `.env.local` and fill it in. The
+SIWE examples require a `SESSION_SECRET` of at least 32 characters.
+
+All Next.js examples default to port 3000, so run one at a time.
 
 ## Contribute
 
-Before starting on anything, please have a read through our [Contribution Guidelines](https://github.com/family/connectkit/blob/main/CONTRIBUTING.md).
+Before starting on anything, please have a read through the
+[Contribution Guidelines](CONTRIBUTING.md).
 
-## Twitter
+## Acknowledgements
 
-Follow [@aave](https://twitter.com/aave) on Twitter for the latest updates on ConnectKit.
+`@biscottidex/connectkit` is a fork of
+[**ConnectKit**](https://github.com/family/connectkit), created by
+**Family (LFE, Inc.)** and used under the BSD 2-Clause License. The original
+project remains the source of the great majority of this codebase, and full
+credit for its design and implementation belongs to Family and its
+contributors.
+
+The original documentation — much of which still applies — is at
+[docs.family.co/connectkit](https://docs.family.co/connectkit).
+
+This project is not affiliated with, endorsed by, or supported by Family or
+LFE, Inc.
 
 ## License
 
-See [LICENSE](https://github.com/family/connectkit/blob/main/LICENSE) for more information.
+BSD 2-Clause. Copyright (c) 2022, LFE, Inc. and copyright (c) 2026, Biscotti
+Finance. See [LICENSE](LICENSE) for the full text and conditions.

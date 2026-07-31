@@ -5,13 +5,48 @@ import packageJson from './package.json';
 
 export default [
   {
-    input: ['./src/index.ts'],
-    external: ['react', 'react-dom', 'framer-motion', 'wagmi'],
+    input: './src/client.tsx',
+    external: [
+      '@biscottidex/connectkit',
+      'react',
+      'react-dom',
+      'react/jsx-runtime',
+      'viem',
+      'viem/siwe',
+    ],
     output: {
-      file: packageJson.exports,
+      file: packageJson.exports['./client'].import,
       format: 'esm',
       sourcemap: false,
     },
-    plugins: [peerDepsExternal(), typescript()],
+    plugins: [
+      peerDepsExternal(),
+      typescript({
+        include: ['**/*.ts', '**/*.tsx'],
+        exclude: 'node_modules/**',
+      }),
+    ],
+  },
+  {
+    input: './src/server.ts',
+    external: [
+      'iron-session',
+      'next',
+      'viem',
+      'viem/chains',
+      'viem/siwe',
+    ],
+    output: {
+      file: packageJson.exports['./server'].import,
+      format: 'esm',
+      sourcemap: false,
+    },
+    plugins: [
+      peerDepsExternal(),
+      typescript({
+        include: ['**/*.ts', '**/*.tsx'],
+        exclude: 'node_modules/**',
+      }),
+    ],
   },
 ];

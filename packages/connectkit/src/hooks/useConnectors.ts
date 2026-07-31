@@ -17,10 +17,6 @@ export function useConnector(id: string, uuid?: string) {
   return connectors.find((c) => c.id === id);
 }
 
-export function useAaveAccountConnector() {
-  return useConnector('aaveAccountProvider');
-}
-
 export function useInjectedConnector(uuid?: string) {
   /*
   options: {

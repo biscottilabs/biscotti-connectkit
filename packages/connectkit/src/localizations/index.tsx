@@ -30,34 +30,52 @@ import { default as viVN } from './locales/vi-VN';
 
 // TODO: tree-shaking
 export const getLocale = (lang: Languages) => {
+  let locale = enUS;
+
   switch (lang) {
     case 'ee-EE':
-      return eeEE;
+      locale = eeEE;
+      break;
     case 'ar-AE':
-      return arAE;
+      locale = arAE;
+      break;
     case 'es-ES':
-      return esES;
+      locale = esES;
+      break;
     case 'fa-IR':
-      return faIR;
+      locale = faIR;
+      break;
     case 'fr-FR':
-      return frFR;
+      locale = frFR;
+      break;
     case 'ja-JP':
-      return jaJP;
+      locale = jaJP;
+      break;
     case 'pt-BR':
-      return ptBR;
+      locale = ptBR;
+      break;
     case 'ru-RU':
-      return ruRU;
+      locale = ruRU;
+      break;
     case 'zh-CN':
-      return zhCN;
+      locale = zhCN;
+      break;
     case 'ca-AD':
-      return caAD;
+      locale = caAD;
+      break;
     case 'tr-TR':
-      return trTR;
+      locale = trTR;
+      break;
     case 'vi-VN':
-      return viVN;
+      locale = viVN;
+      break;
     default:
       return enUS;
   }
+
+  // New SDK surfaces can ship in English without breaking older locale files.
+  // A translated value always wins when it exists.
+  return { ...enUS, ...locale };
 };
 
 /*

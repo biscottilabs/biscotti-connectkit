@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useContext } from '../../ConnectKit';
 import {
-  isAaveAccountConnector,
   isSafeConnector,
   nFormatter,
   truncateEthAddress,
@@ -13,7 +12,6 @@ import {
   useAccount,
   useEnsName,
   useBalance,
-  useConnectorClient,
 } from 'wagmi';
 
 import {
@@ -52,10 +50,6 @@ const Profile: React.FC<{ closeModal?: () => void }> = ({ closeModal }) => {
   const { disconnect } = useDisconnect();
 
   const { address, isConnected, connector, chain } = useAccount();
-  const isAaveAccount = isAaveAccountConnector(connector?.id);
-  const { data: connectorClient } = useConnectorClient({
-    connector,
-  });
 
   const ensFallbackConfig = useEnsFallbackConfig();
   const { data: ensName } = useEnsName({
@@ -143,35 +137,10 @@ const Profile: React.FC<{ closeModal?: () => void }> = ({ closeModal }) => {
         )}
       </ModalContent>
 
-      {isAaveAccount && (
-        <>
-          <Button
-            onClick={async () => {
-              try {
-                await connectorClient?.request<{
-                  Method: 'aave_switchAccounts';
-                  Parameters: [];
-                  ReturnType: { message: string; success: boolean };
-                }>({
-                  method: 'aave_switchAccounts',
-                  params: [],
-                });
-              } catch (error) {
-                context.log(
-                  'rpc method aave_switchAccounts is not implemented in this connector',
-                  error
-                );
-              }
-            }}
-          >
-            {locales.switchWallets}
-          </Button>
-        </>
-      )}
       {!isSafeConnector(connector?.id) && (
         <Button
           onClick={() => setShouldDisconnect(true)}
-          icon={isAaveAccount ? undefined : <DisconnectIcon />}
+          icon={<DisconnectIcon />}
         >
           {locales.disconnect}
         </Button>

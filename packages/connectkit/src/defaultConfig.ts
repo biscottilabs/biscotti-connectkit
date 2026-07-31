@@ -2,9 +2,9 @@ import { http } from 'wagmi';
 import { type CreateConfigParameters } from '@wagmi/core';
 import { mainnet, polygon, optimism, arbitrum } from 'wagmi/chains';
 import { CoinbaseWalletParameters } from 'wagmi/connectors';
-import { EthereumProviderOptions as AaveAccountOptions } from '@aave/account';
 
 import defaultConnectors from './defaultConnectors';
+import type { CircleOptions } from './circle/types';
 
 // TODO: Move these to a provider rather than global variable
 let globalAppName: string;
@@ -22,9 +22,9 @@ type DefaultConfigProps = {
   walletConnectProjectId: string;
   // Coinbase Wallet preference
   coinbaseWalletPreference?: CoinbaseWalletParameters<'4'>['preference'];
-  // Aave Account options
-  enableAaveAccount?: boolean;
-  aaveAccountOptions?: AaveAccountOptions;
+  // Sign in with Circle. Declaring it here is enough: the connector carries its
+  // own options, so ConnectKitProvider picks them up without a second copy.
+  circle?: CircleOptions;
 } & Partial<CreateConfigParameters>;
 
 const defaultConfig = ({
@@ -34,10 +34,9 @@ const defaultConfig = ({
   appUrl,
   walletConnectProjectId,
   coinbaseWalletPreference,
+  circle,
   chains = [mainnet, polygon, optimism, arbitrum],
   client,
-  enableAaveAccount = true,
-  aaveAccountOptions,
   ...props
 }: DefaultConfigProps): CreateConfigParameters => {
   globalAppName = appName;
@@ -59,8 +58,7 @@ const defaultConfig = ({
       },
       walletConnectProjectId,
       coinbaseWalletPreference,
-      enableAaveAccount,
-      aaveAccountOptions,
+      circle,
     });
 
   const config: CreateConfigParameters<any, any> = {

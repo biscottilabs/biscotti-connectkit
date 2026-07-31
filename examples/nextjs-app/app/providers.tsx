@@ -5,14 +5,16 @@ import { type ReactNode } from 'react';
 import { WagmiProvider } from 'wagmi';
 
 import { config } from '../config';
-import { ConnectKitProvider } from 'connectkit';
+import { ConnectKitProvider } from '@biscottidex/connectkit';
 
 const queryClient = new QueryClient();
 export function Providers(props: { children: ReactNode }) {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        <ConnectKitProvider>{props.children}</ConnectKitProvider>
+        {/* Circle is configured in config.ts; debugMode surfaces the itemised
+            configuration diagnostics instead of the generic user message. */}
+        <ConnectKitProvider debugMode>{props.children}</ConnectKitProvider>
       </QueryClientProvider>
     </WagmiProvider>
   );

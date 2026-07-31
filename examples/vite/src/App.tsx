@@ -1,4 +1,4 @@
-import { ConnectKitButton } from 'connectkit';
+import { ConnectKitButton } from '@biscottidex/connectkit';
 
 function App() {
   return (

@@ -25,10 +25,13 @@ import {
   useConnectCallback,
   useConnectCallbackProps,
 } from '../hooks/useConnectCallback';
-import { useConnector } from '../hooks/useConnectors';
-import { WagmiContext, useAccount } from 'wagmi';
+import { WagmiContext, useAccount, useConfig } from 'wagmi';
 import { Web3ContextProvider } from './contexts/web3';
 import { useChainIsSupported } from '../hooks/useChainIsSupported';
+import type { CircleOptions } from '../circle';
+import { isCircleEnabled } from '../circle/types';
+import { shouldResumeGoogleLogin } from '../circle/login';
+import { CIRCLE_CONNECTOR_ID } from '../circle/connector';
 
 export const routes = {
   ONBOARDING: 'onboarding',
@@ -40,6 +43,7 @@ export const routes = {
   PROFILE: 'profile',
   SWITCHNETWORKS: 'switchNetworks',
   SIGNINWITHETHEREUM: 'signInWithEthereum',
+  CIRCLE: 'circle',
 };
 
 type Connector = {
@@ -96,6 +100,9 @@ export type ConnectKitOptions = {
   walletOnboardingUrl?: string;
   disableSiweRedirect?: boolean; // Disable redirect to SIWE page after a wallet is connected
   overlayBlur?: number; // Blur the background when the modal is open
+  // Sign in with Circle (user-controlled wallets). Opt-in: omitting this
+  // disables the integration entirely and adds nothing to the bundle.
+  circle?: CircleOptions;
 };
 
 type ConnectKitProviderProps = {
@@ -137,8 +144,6 @@ export const ConnectKitProvider = ({
 
   const chains = useChains();
 
-  const injectedConnector = useConnector('injected');
-
   // Default config options
   const defaultOptions: ConnectKitOptions = {
     language: 'en-US',
@@ -164,6 +169,11 @@ export const ConnectKitProvider = ({
   };
 
   const opts: ConnectKitOptions = Object.assign({}, defaultOptions, options);
+  const wagmiConfig = useConfig();
+  const circleConnector = wagmiConfig.connectors.find(
+    (candidate) => candidate.id === CIRCLE_CONNECTOR_ID
+  ) as { circleOptions?: CircleOptions } | undefined;
+  const circleOptions = opts.circle ?? circleConnector?.circleOptions;
 
   if (typeof window !== 'undefined') {
     // Buffer Polyfill, needed for bundlers that don't provide Node polyfills (e.g CRA, Vite, etc.)
@@ -199,6 +209,15 @@ export const ConnectKitProvider = ({
   useEffect(() => setTheme(theme), [theme]);
   useEffect(() => setLang(opts.language || 'en-US'), [opts.language]);
   useEffect(() => setErrorMessage(null), [route, open]);
+
+  // A full-page Google redirect resets the modal to closed. Mount Circle's
+  // continuation page immediately so it can finish provisioning and connect
+  // wagmi without asking the user to click "Connect Wallet" a second time.
+  useEffect(() => {
+    if (!isCircleEnabled(circleOptions) || !shouldResumeGoogleLogin()) return;
+    setRoute(routes.CIRCLE);
+    setOpen(true);
+  }, []);
 
   // Check if chain is supported, elsewise redirect to switches page
   const { chain, isConnected } = useAccount();

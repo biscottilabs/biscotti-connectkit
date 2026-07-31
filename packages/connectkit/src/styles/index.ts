@@ -90,8 +90,6 @@ const themeGlobals = {
     },
   },
   brand: {
-    '--ck-aave-brand': '#9896FF',
-    '--ck-aave-brand-hover': '#8784FF',
     '--ck-brand-walletConnect': '#3B99FC',
     '--ck-brand-coinbaseWallet': '#0052FF',
     '--ck-brand-metamask': '#FF5C16',
@@ -129,7 +127,7 @@ const themeColors = {
  *  Automatically use p3 if available
  */
 //  TODO: Don't use :any type
-const createCssVars = (scheme: any, important?: boolean) => {
+const createCssVars = (scheme: any, _important?: boolean) => {
   return css`
     ${Object.keys(scheme).map((key) => {
       const value = scheme[key];
@@ -242,7 +240,7 @@ export const ResetContainer = styled(motion.div)<{
     }
   }}
 
-  ${(props) => {
+  ${() => {
     switch (mode) {
       case 'light':
         return globalsLight;

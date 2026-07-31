@@ -9,21 +9,27 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "connectkit": "workspace:packages/connectkit",
-    "connectkit-next-siwe": "workspace:packages/connectkit-next-siwe",
+    "@tanstack/react-query": "^5.17.15",
+    "@wagmi/connectors": "5.10.0",
+    "@wagmi/core": "2.21.0",
+    "@biscottidex/connectkit": "workspace:packages/connectkit",
+    "@biscottidex/connectkit-next-siwe": "workspace:packages/connectkit-next-siwe",
     "next": "15.5.14",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
     "siwe": "^2.1.4",
-    "viem": "^2.23.2",
-    "wagmi": "^2.14.11"
+    "viem": "^2.55.10",
+    "wagmi": "^2.17.0"
   },
   "devDependencies": {
     "@types/node": "18.7.18",
     "@types/react": "^18.0.6",
     "@types/react-dom": "^18.0.2",
-    "eslint": "8.23.1",
+    "autoprefixer": "10.4.20",
+    "eslint": "8.57.1",
     "eslint-config-next": "15.5.14",
-    "typescript": "^5.0.4"
+    "postcss": "8.4.49",
+    "tailwindcss": "3.4.17",
+    "typescript": "5.3.3"
   }
 }

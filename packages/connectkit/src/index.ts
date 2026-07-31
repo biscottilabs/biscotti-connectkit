@@ -1,4 +1,4 @@
-export const CONNECTKIT_VERSION = '1.9.2';
+export const CONNECTKIT_VERSION = '0.0.1';
 
 export * as Types from './types';
 export { default as getDefaultConfig } from './defaultConfig';
@@ -15,6 +15,38 @@ export {
 export type { SIWESession, SIWEConfig } from './siwe';
 
 export { ConnectKitProvider, Context } from './components/ConnectKit';
+
+// Sign in with Circle (user-controlled wallets)
+export {
+  isCircleEnabled,
+  preflightCircleConfig,
+  createHttpBackendAdapter,
+  CircleBackendError,
+  CIRCLE_DEFAULT_BASE_PATH,
+  circleChainsByChainId,
+  toCircleBlockchain,
+  toChainId,
+  isCircleSupportedChain,
+  useCircleLogin,
+  readSession as readCircleSession,
+  clearSession as clearCircleSession,
+} from './circle';
+export type {
+  CircleSession,
+  CircleLoginStatus,
+  UseCircleLoginResult,
+  CircleOptions,
+  CircleLoginMethod,
+  CircleConfigIssue,
+  CircleConfigScope,
+  CircleBackendAdapter,
+  CircleEndpointConfig,
+  CircleWallet,
+  CircleEmailOtpResult,
+  CircleBlockchain,
+  CircleChainMap,
+  CircleHealthReport,
+} from './circle';
 export { ConnectKitButton } from './components/ConnectButton';
 export { default as SIWEButton } from './components/Standard/SIWE';
 

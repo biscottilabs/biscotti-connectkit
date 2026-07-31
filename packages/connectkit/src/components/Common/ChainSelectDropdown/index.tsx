@@ -38,7 +38,7 @@ const ChainSelectDropdown: React.FC<{
 
   const locales = useLocales();
 
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [offset] = useState({ x: 0, y: 0 });
 
   useLockBodyScroll(open);
 
@@ -120,8 +120,8 @@ const ChainSelectDropdown: React.FC<{
       return;
     }
 
-    let x = bounds.left + offsetX;
-    let y = bounds.top + bounds.height + offsetY;
+    const x = bounds.left + offsetX;
+    const y = bounds.top + bounds.height + offsetY;
 
     targetRef.current.style.left = `${x}px`;
     targetRef.current.style.top = `${y}px`;

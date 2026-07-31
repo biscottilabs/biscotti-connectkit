@@ -13,7 +13,6 @@ import Chain from '../Common/Chain';
 import { chainConfigs } from '../../constants/chainConfigs';
 import ThemedButton from '../Common/ThemedButton';
 import { nFormatter } from '../../utils';
-import { useChains } from '../../hooks/useChains';
 import { useChainIsSupported } from '../../hooks/useChainIsSupported';
 
 const Container = styled(motion.div)`
@@ -52,7 +51,6 @@ export const Balance: React.FC<BalanceProps> = ({ hideIcon, hideSymbol }) => {
   const [isInitial, setIsInitial] = useState(true);
 
   const { address, chain } = useAccount();
-  const chains = useChains();
   const isChainSupported = useChainIsSupported(chain?.id);
 
   const queryClient = useQueryClient();

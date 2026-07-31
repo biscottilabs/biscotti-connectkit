@@ -92,7 +92,6 @@ const ConnectModal: React.FC<{
 }> = ({
   theme = 'auto',
   customTheme = customThemeDefault,
-  lang = 'en-US',
   mode = 'auto',
   inline = false,
   open,

@@ -1,8 +1,8 @@
 {
-  "name": "cra-template-connectkit",
+  "name": "cra-template-biscotti-finance-connectkit",
   "version": "0.0.1",
-  "author": "Aave",
-  "homepage": "https://docs.family.co/connectkit",
+  "author": "Biscotti Finance",
+  "homepage": "https://github.com/biscottilabs/biscotti-connectkit",
   "keywords": [
     "react",
     "create-react-app",
@@ -13,7 +13,7 @@
   "description": "ConnectKit + TypeScript template for Create React App.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/family/connectkit.git",
+    "url": "git+https://github.com/biscottilabs/biscotti-connectkit.git",
     "directory": "packages/cra-template"
   },
   "license": "MIT",
@@ -21,7 +21,7 @@
     "node": ">=14"
   },
   "bugs": {
-    "url": "https://github.com/family/connectkit/issues"
+    "url": "https://github.com/biscottilabs/biscotti-connectkit/issues"
   },
   "files": [
     "template",

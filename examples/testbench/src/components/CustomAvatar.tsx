@@ -1,4 +1,4 @@
-import { Types } from 'connectkit';
+import { Types } from '@biscottidex/connectkit';
 
 import { motion } from 'framer-motion';
 

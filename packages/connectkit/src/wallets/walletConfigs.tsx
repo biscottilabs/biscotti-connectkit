@@ -1,4 +1,5 @@
 import Logos from '../assets/logos';
+import { CircleLogo } from '../assets/circle';
 import { isAndroid } from '../utils';
 
 /**
@@ -21,8 +22,11 @@ export type WalletConfigProps = {
   iconShouldShrink?: boolean;
   // Links to download the wallet
   downloadUrls?: {
-    // Download redirect, hosted by Family.co
-    // This URL redirects to the correct download URL based on the user's device
+    // Download redirect. These point at connect.family.co, a live third-party
+    // service inherited from upstream ConnectKit that resolves to the correct
+    // store or extension listing for the user's device. The URL is encoded into
+    // the QR code on the "Download app" screen, so changing the domain without
+    // standing up an equivalent redirector would silently produce dead QR codes.
     // Note: this will eventually be automated by the below data
     download?: string;
     // wallet's website
@@ -50,12 +54,11 @@ export const walletConfigs: {
   mock: {
     icon: <Logos.Mock />,
   },
-  aaveAccountProvider: {
-    name: 'Aave Account',
-    shortName: 'Aave',
-    icon: <Logos.AaveAccount />,
-    iconConnector: <Logos.AaveAccount />,
-    iconShape: 'squircle',
+  circle: {
+    name: 'Sign in with Circle',
+    shortName: 'Circle',
+    icon: <CircleLogo width={32} height={32} />,
+    iconShape: 'circle',
   },
   argent: {
     name: 'Argent',

@@ -10,7 +10,6 @@ import {
   Connector,
 } from 'wagmi';
 import { useContext } from '../components/ConnectKit';
-import { useLastConnector } from './useLastConnector';
 
 export function useConnect({ ...props }: UseConnectParameters = {}) {
   const context = useContext();

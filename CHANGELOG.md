@@ -1,3 +1,47 @@
+# 0.0.1
+
+This is the first release under the Biscotti Finance name. The package is a fork of
+[ConnectKit](https://github.com/family/connectkit) by Family (LFE, Inc.), used under the
+BSD 2-Clause License. Releases up to and including 1.9.2 below are Family's original
+changelog, kept for reference.
+
+## Breaking
+
+- Renamed the packages:
+  - `connectkit` → `@biscottidex/connectkit`
+  - `connectkit-next-siwe` → `@biscottidex/connectkit-next-siwe`
+
+  Update your imports accordingly. The exported React API is unchanged —
+  `ConnectKitProvider`, `ConnectKitButton`, `getDefaultConfig` and friends keep their
+  names, as do the `--ck-*` CSS variables, so themes and JSX need no changes.
+
+- Removed the Aave Account connector and its options. `enableAaveAccount` and
+  `aaveAccountOptions` no longer exist on `getDefaultConfig` / `getDefaultConnectors`;
+  passing them is now a type error. The `@aave/account` dependency is gone.
+
+  Default connectors are now MetaMask (and other injected wallets), Coinbase Wallet, and
+  WalletConnect when a `walletConnectProjectId` is supplied. Safe is still added
+  automatically inside an iframe.
+
+  If you relied on the Aave Account connector, pass it yourself via the `connectors`
+  option instead.
+
+## Removed
+
+- The "Continue with Aave" button, the Aave entry in the wallet list, the
+  `aave_switchAccounts` control in the profile screen, the `--ck-aave-brand` theme
+  variables, and the `continueWithAave` locale string.
+
+## Fixed
+
+- The published packages now include `LICENSE`. Previously `files` omitted it and the
+  license lived only at the repository root, so npm tarballs shipped without the
+  copyright notice the license requires.
+- `license` is now the valid SPDX identifier `BSD-2-Clause` (was `"BSD-2-Clause license"`,
+  which no tooling recognises).
+- Button focus rings now use `--ck-focus-color` rather than the removed brand variable, so
+  `:focus-visible` outlines are preserved.
+
 # 1.9.2
 
 This update rebrands Family Accounts as Aave Account and includes a configuration option rename that may require changes in your app configuration.

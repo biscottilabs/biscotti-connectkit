@@ -10,12 +10,14 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.17.15",
-    "connectkit": "workspace:packages/connectkit",
+    "@wagmi/connectors": "5.10.0",
+    "@wagmi/core": "2.21.0",
+    "@biscottidex/connectkit": "workspace:packages/connectkit",
     "next": "15.5.14",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "viem": "^2.23.2",
-    "wagmi": "^2.14.11"
+    "viem": "^2.55.10",
+    "wagmi": "^2.17.0"
   },
   "devDependencies": {
     "@types/node": "^18.19.3",
@@ -23,6 +25,6 @@
     "eslint": "^8.15.0",
     "eslint-config-next": "^15.5.14",
     "next": "^15.5.14",
-    "typescript": "^5.0.4"
+    "typescript": "5.3.3"
   }
 }
