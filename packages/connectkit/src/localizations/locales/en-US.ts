@@ -119,16 +119,27 @@ const enUS = {
   circleScreen_heading: 'Sign in with Circle',
   circleScreen_h1: 'Create a wallet with the account you already have.',
   circleScreen_p:
-    'Circle secures your wallet with a PIN. No extension or seed phrase needed.',
+    'Circle securely verifies each action. No extension or seed phrase needed.',
   circleScreen_continueWithGoogle: 'Continue with Google',
   circleScreen_continueWithEmail: 'Email & one-time code',
   circleScreen_continueWithPin: 'PIN only',
   circleScreen_comingSoon: 'Coming soon',
+  circleScreen_email_h1: 'Continue with email',
+  circleScreen_email_p:
+    'We’ll send a one-time code to verify your email and create or unlock your Circle wallet.',
+  circleScreen_email_label: 'Email address',
+  circleScreen_email_placeholder: 'you@example.com',
+  circleScreen_email_submit: 'Send one-time code',
+  circleScreen_email_verifying:
+    'Check your email and enter the code in Circle’s secure window.',
+  circleScreen_cancelEmail: 'Cancel and use another method',
+  circleScreen_chooseAnotherMethod: '← Choose another method',
   circleScreen_securedByCircle: 'Secured by Circle',
+  circleScreen_checking: 'Checking Circle configuration…',
   circleScreen_redirecting: 'Redirecting to Google…',
-  circleScreen_awaitingPin: 'Finish setting up your wallet',
+  circleScreen_awaitingPin: 'Approve your wallet setup',
   circleScreen_awaitingPin_p:
-    'Follow the prompts from Circle to set your PIN and create your wallet.',
+    'Follow Circle’s secure prompt to create your wallet.',
   circleScreen_creatingWallet: 'Creating your wallet…',
   circleScreen_connected: 'Wallet ready',
 

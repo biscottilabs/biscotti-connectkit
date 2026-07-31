@@ -3,7 +3,12 @@ import { useChainId } from 'wagmi';
 
 import { useContext } from '../components/ConnectKit';
 import { resolveBackendAdapter } from './backend';
-import { beginGoogleLogin, ensureWallet, resumeGoogleLogin } from './login';
+import {
+  beginEmailLogin,
+  beginGoogleLogin,
+  ensureWallet,
+  resumeGoogleLogin,
+} from './login';
 import {
   hasBlockingIssues,
   issuesFromHealth,
@@ -15,6 +20,27 @@ import { resetCircleSdk } from './sdk';
 import { isCircleEnabled, type CircleConfigIssue, type CircleWallet } from './types';
 import { useCircleOptions } from './useCircleOptions';
 
+const CIRCLE_HEALTH_TIMEOUT_MS = 2_500;
+
+const withTimeout = <T,>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string
+): Promise<T> =>
+  new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
+
 export type CircleLoginStatus =
   | 'disabled'
   /** Running preflight + probing the backend. */
@@ -22,9 +48,12 @@ export type CircleLoginStatus =
   /** Configuration is incomplete; `issues` says what is missing. */
   | 'unconfigured'
   | 'ready'
-  /** Redirecting to Google, or completing the round trip. */
+  /** Redirecting to Google or waiting for Circle's hosted email OTP UI. */
   | 'authenticating'
-  /** Circle's hosted PIN UI is open. */
+  /**
+   * Circle's hosted wallet-setup challenge is open.
+   * The value is retained for backwards compatibility with the initial API.
+   */
   | 'awaitingPin'
   | 'connected'
   | 'error';
@@ -39,7 +68,12 @@ export type UseCircleLoginResult = {
   wallet: CircleWallet | null;
   address?: string;
   error: Error | null;
+  activeMethod: 'google' | 'email' | null;
+  /** Backwards-compatible shorthand for Google authentication. */
   signIn: () => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
+  signInWithEmail: (email: string) => Promise<void>;
+  cancelSignIn: () => void;
   signOut: () => void;
 };
 
@@ -63,10 +97,11 @@ export const useCircleLogin = (): UseCircleLoginResult => {
   const [session, setSession] = useState<CircleSession | null>(null);
   const [wallet, setWallet] = useState<CircleWallet | null>(null);
   const [error, setError] = useState<Error | null>(null);
+  const [activeMethod, setActiveMethod] = useState<
+    'google' | 'email' | null
+  >(null);
 
-  // Guards React 18 StrictMode's double effect: resuming a login twice would
-  // consume the pending record and fail the second time.
-  const resumedRef = useRef(false);
+  const authAttemptRef = useRef(0);
 
   const adapter = resolveBackendAdapter(circle);
   const canShowDiagnostics = shouldShowDiagnostics(context.debugMode);
@@ -88,7 +123,14 @@ export const useCircleLogin = (): UseCircleLoginResult => {
 
     let serverIssues: CircleConfigIssue[] = [];
     try {
-      serverIssues = issuesFromHealth(await adapter.health?.());
+      const report = adapter.health
+        ? await withTimeout(
+            adapter.health(),
+            CIRCLE_HEALTH_TIMEOUT_MS,
+            `The Circle backend health check timed out after ${CIRCLE_HEALTH_TIMEOUT_MS}ms.`
+          )
+        : undefined;
+      serverIssues = issuesFromHealth(report);
     } catch (healthError) {
       // An unreachable health route is itself a useful diagnostic, but it must
       // not mask the client-side issues we already found.
@@ -116,8 +158,6 @@ export const useCircleLogin = (): UseCircleLoginResult => {
       setStatus('disabled');
       return;
     }
-    if (resumedRef.current) return;
-    resumedRef.current = true;
 
     let cancelled = false;
 
@@ -177,15 +217,17 @@ export const useCircleLogin = (): UseCircleLoginResult => {
     return () => {
       cancelled = true;
     };
-    // Intentionally keyed on `enabled` alone. This effect consumes the one-shot
-    // pending-login record, so re-running it when a callback identity changes
-    // would attempt to resume a login that has already been consumed.
+    // Intentionally keyed on `enabled` alone. React Strict Mode runs this effect
+    // twice in development; the first pass is cancelled before it can consume
+    // the one-shot OAuth record, and the second pass completes initialization.
   }, [enabled]);
 
-  const signIn = useCallback(async () => {
+  const signInWithGoogle = useCallback(async () => {
     if (!enabled || !circle) return;
 
     setError(null);
+    setActiveMethod('google');
+    authAttemptRef.current += 1;
 
     const found = await check();
     if (hasBlockingIssues(found)) {
@@ -202,12 +244,70 @@ export const useCircleLogin = (): UseCircleLoginResult => {
     }
   }, [adapter, chainId, check, circle, enabled, fail]);
 
+  const signInWithEmail = useCallback(
+    async (email: string) => {
+      if (!enabled || !circle) return;
+
+      const normalizedEmail = email.trim().toLowerCase();
+      if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+        fail(new Error('Enter a valid email address.'));
+        return;
+      }
+
+      setError(null);
+      setActiveMethod('email');
+      const attempt = ++authAttemptRef.current;
+
+      const found = await check();
+      if (hasBlockingIssues(found)) {
+        setStatus('unconfigured');
+        return;
+      }
+
+      setStatus('authenticating');
+      try {
+        const authenticated = await beginEmailLogin({
+          circle,
+          adapter,
+          chainId,
+          email: normalizedEmail,
+        });
+        if (attempt !== authAttemptRef.current) return;
+        setSession(authenticated);
+        setStatus('awaitingPin');
+
+        const provisioned = await ensureWallet({
+          circle,
+          adapter,
+          chainId,
+          session: authenticated,
+        });
+        if (attempt !== authAttemptRef.current) return;
+        setWallet(provisioned);
+        setStatus('connected');
+      } catch (signInError) {
+        if (attempt !== authAttemptRef.current) return;
+        fail(signInError);
+      }
+    },
+    [adapter, chainId, check, circle, enabled, fail]
+  );
+
+  const cancelSignIn = useCallback(() => {
+    authAttemptRef.current += 1;
+    setError(null);
+    setActiveMethod(null);
+    setStatus(enabled ? 'ready' : 'disabled');
+  }, [enabled]);
+
   const signOut = useCallback(() => {
+    authAttemptRef.current += 1;
     clearSession();
     resetCircleSdk();
     setSession(null);
     setWallet(null);
     setError(null);
+    setActiveMethod(null);
     setStatus(enabled ? 'ready' : 'disabled');
   }, [enabled]);
 
@@ -220,7 +320,11 @@ export const useCircleLogin = (): UseCircleLoginResult => {
     wallet,
     address: wallet?.address ?? session?.address,
     error,
-    signIn,
+    activeMethod,
+    signIn: signInWithGoogle,
+    signInWithGoogle,
+    signInWithEmail,
+    cancelSignIn,
     signOut,
   };
 };

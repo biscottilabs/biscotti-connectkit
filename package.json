@@ -15,6 +15,7 @@
     "dev:nextjs-app": "bun --filter nextjs-app dev",
     "dev:nextjs-siwe": "bun --filter nextjs-siwe dev",
     "dev:vite": "bun --filter vite-example dev",
+    "dev:circle": "bun run --cwd examples/vite dev:circle",
     "dev:testbench": "bun --filter testbench dev",
     "build": "bun run build.js && bun --filter biscotti-finance-connectkit build && cp README.md packages/connectkit/README.md",
     "build:connectkit-next-siwe": "bun --filter biscotti-finance-connectkit-next-siwe build",

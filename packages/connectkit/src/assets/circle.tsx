@@ -1,30 +1,48 @@
 import React from 'react';
 
 /**
- * Circle's mark, drawn as concentric arcs so it inherits `currentColor` and
- * works on both light and dark modal themes without a second asset.
+ * Circle's official 2024 inset mark. The white disc keeps the gradient artwork
+ * legible on both light and dark modal themes.
  */
 export const CircleLogo = ({ ...props }) => (
   <svg
     width="28"
     height="28"
-    viewBox="0 0 28 28"
+    viewBox="0 0 120 120"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
     {...props}
   >
-    <circle cx="14" cy="14" r="14" fill="#0E9DE5" />
+    <defs>
+      <linearGradient
+        id="circle-logo-gradient-purple"
+        x1="80.1492%"
+        y1="20.5699%"
+        x2="0%"
+        y2="94.4792%"
+      >
+        <stop offset="0%" stopColor="#5FBFFF" />
+        <stop offset="100%" stopColor="#B090F5" />
+      </linearGradient>
+      <linearGradient
+        id="circle-logo-gradient-green"
+        x1="0%"
+        y1="94.0951%"
+        x2="112.0813%"
+        y2="-8.9102%"
+      >
+        <stop offset="0%" stopColor="#68D7FA" />
+        <stop offset="100%" stopColor="#7EF1B3" />
+      </linearGradient>
+    </defs>
+    <circle cx="60" cy="60" r="60" fill="#FFFFFF" />
     <path
-      d="M14 5.5a8.5 8.5 0 1 0 0 17"
-      stroke="#fff"
-      strokeWidth="2.6"
-      strokeLinecap="round"
+      d="M96.8789 31.4498 92.009 36.3063a2.177 2.177 0 0 0-.2712 2.7508 38.052 38.052 0 0 1 4.2382 8.7078l.013-.0126a38.09 38.09 0 0 1 2.0021 12.1974c0 21.0363-17.1605 38.1502-38.2535 38.1502a38.284 38.284 0 0 1-17.9283-4.4386l8.2536-8.2309a27.324 27.324 0 0 0 9.6747 1.7694c15.0665 0 27.3238-12.2243 27.3238-27.2501 0-.9386-.0566-1.8802-.155-2.8192a27.152 27.152 0 0 0-2.5784-9.0556c-.6563-1.3533-2.4543-1.6611-3.5203-.5977l-4.9432 4.9302a2.174 2.174 0 0 0-.5831 2.0373l.4147 1.7701c.2892 1.2343.4356 2.4912.4356 3.7348 0 9.0156-7.3542 16.35-16.3942 16.35a16.39 16.39 0 0 1-8.1165-2.1517l-2.1748-1.2425a2.176 2.176 0 0 0-2.6321.3499L26.661 93.3531a2.176 2.176 0 0 0 .2156 3.2716l2.9685 2.2696A48.958 48.958 0 0 0 59.7376 109c27.1194 0 49.1827-22.0041 49.1827-49.0503a49.04 49.04 0 0 0-6.4678-24.327l-2.1308-3.7139a2.177 2.177 0 0 0-3.4428-.459"
+      fill="url(#circle-logo-gradient-purple)"
     />
     <path
-      d="M14 9.5a4.5 4.5 0 1 1 0 9"
-      stroke="#fff"
-      strokeWidth="2.6"
-      strokeLinecap="round"
+      d="M60.3969 11.0795C33.1592 11.0795 11 33.0833 11 60.1295a49.035 49.035 0 0 0 6.4956 24.3274l2.1404 3.7139a2.177 2.177 0 0 0 3.4577.4589l4.8904-4.8558a2.176 2.176 0 0 0 .2727-2.7505 38.139 38.139 0 0 1-4.2569-8.708l-.012.0119a38.09 38.09 0 0 1-2.0111-12.1978c0-21.0357 17.2355-38.1503 38.4201-38.1503a38.452 38.452 0 0 1 18.0058 4.4388l-8.289 8.2311a27.448 27.448 0 0 0-9.7168-1.7697c-15.1324 0-27.4426 12.2246-27.4426 27.2501 0 .455.0166.9102.0395 1.3656.0076.1478.0174.2949.0275.4423.0239.3553.0547.7106.0931 1.0656a27.116 27.116 0 0 0 2.5863 9c.6584 1.3536 2.465 1.6607 3.5353.5973l4.9632-4.9277a2.175 2.175 0 0 0 .5853-2.0375l-.4165-1.7708a16.55 16.55 0 0 1-.4368-3.7348c0-9.0153 7.3862-16.35 16.4655-16.35 2.8572 0 5.6756.7441 8.1504 2.1517l2.1854 1.2433a2.178 2.178 0 0 0 2.6439-.3499l20.2399-20.0981a2.176 2.176 0 0 0-.2162-3.2716l-2.9818-2.2696a49.166 49.166 0 0 0-30.0217-10.1057"
+      fill="url(#circle-logo-gradient-green)"
     />
   </svg>
 );
@@ -60,25 +78,13 @@ export const MailIcon = ({ ...props }) => (
   <svg
     width="20"
     height="20"
-    viewBox="0 0 20 20"
-    fill="none"
+    viewBox="0 0 24 24"
     xmlns="http://www.w3.org/2000/svg"
     {...props}
   >
-    <rect
-      x="2"
-      y="4"
-      width="16"
-      height="12"
-      rx="2"
-      stroke="currentColor"
-      strokeWidth="1.8"
-    />
     <path
-      d="m2.8 5.5 6.3 4.7a1.5 1.5 0 0 0 1.8 0l6.3-4.7"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
+      d="M20 4H4a2 2 0 0 0-1.99 2L2 18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 4-8 5-8-5V6l8 5 8-5v2Z"
+      fill="currentColor"
     />
   </svg>
 );

@@ -59,6 +59,71 @@ export const MethodHint = styled.span`
   color: var(--ck-body-color-muted);
 `;
 
+export const EmailForm = styled.form`
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+`;
+
+export const EmailLabel = styled.label`
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ck-body-color);
+`;
+
+export const EmailInput = styled.input`
+  width: 100%;
+  box-sizing: border-box;
+  padding: 13px 14px;
+  border: 1px solid var(--ck-body-color-muted);
+  border-radius: var(--ck-primary-button-border-radius, 14px);
+  outline: none;
+  background: var(--ck-body-background-secondary);
+  color: var(--ck-body-color);
+  font: inherit;
+
+  &:focus {
+    border-color: var(--ck-focus-color, var(--ck-body-color));
+    box-shadow: 0 0 0 2px var(--ck-focus-color, rgba(31, 26, 48, 0.15));
+  }
+`;
+
+export const EmailSubmit = styled.button`
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: var(--ck-primary-button-border-radius, 16px);
+  background: var(--ck-primary-button-background);
+  color: var(--ck-primary-button-color);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 100ms ease, opacity 100ms ease;
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.5;
+  }
+  &:not(:disabled):hover {
+    transform: scale(1.01);
+  }
+  &:not(:disabled):active {
+    transform: scale(0.99);
+  }
+`;
+
+export const BackButton = styled.button`
+  align-self: flex-start;
+  padding: 0;
+  color: var(--ck-body-color-muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--ck-body-color);
+  }
+`;
+
 export const Footnote = styled.div`
   display: flex;
   align-items: center;
@@ -79,9 +144,24 @@ export const IssueList = styled.ul`
   flex-direction: column;
   gap: 10px;
   margin: 0;
-  padding: 0;
+  padding: 0 2px 0 0;
+  max-height: min(280px, calc(100vh - 260px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
   list-style: none;
   text-align: left;
+
+  scrollbar-width: thin;
+  scrollbar-color: var(--ck-body-color-muted) transparent;
+
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    border-radius: 4px;
+    background: var(--ck-body-color-muted);
+  }
 `;
 
 export const Issue = styled.li`

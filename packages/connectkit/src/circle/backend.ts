@@ -2,6 +2,7 @@ import type {
   CircleBackendAdapter,
   CircleChallengeResponse,
   CircleDeviceTokenResult,
+  CircleEmailOtpResult,
   CircleEndpointConfig,
   CircleHealthReport,
   CircleOptions,
@@ -79,6 +80,9 @@ export const createHttpBackendAdapter = (
   return {
     createDeviceToken: (input) =>
       request<CircleDeviceTokenResult>('/device-token', input),
+
+    requestEmailOtp: (input) =>
+      request<CircleEmailOtpResult>('/email-otp', input),
 
     initializeUser: (input) =>
       request<CircleChallengeResponse>('/initialize-user', input),

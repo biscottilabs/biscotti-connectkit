@@ -1,15 +1,13 @@
 'use client';
 
+import { useState } from 'react';
 import { useCircleLogin } from 'biscotti-finance-connectkit';
 
 /**
- * Phase 2 test surface for Sign in with Circle.
- *
- * This exercises the login flow directly, before the wagmi connector exists, so
- * the OAuth redirect and PIN challenge can be verified in isolation. The real
- * entry point lands in the ConnectKit modal later.
+ * Headless example for developers building their own Circle authentication UI.
  */
 export function CirclePanel() {
+  const [email, setEmail] = useState('');
   const {
     status,
     enabled,
@@ -18,7 +16,10 @@ export function CirclePanel() {
     address,
     session,
     error,
-    signIn,
+    activeMethod,
+    signInWithGoogle,
+    signInWithEmail,
+    cancelSignIn,
     signOut,
   } = useCircleLogin();
 
@@ -28,6 +29,7 @@ export function CirclePanel() {
     <div style={{ marginTop: 24, padding: 16, border: '1px solid #ccc' }}>
       <h2>Sign in with Circle</h2>
       <div>status: {status}</div>
+      {activeMethod && <div>method: {activeMethod}</div>}
 
       {status === 'unconfigured' &&
         (canShowDiagnostics ? (
@@ -60,7 +62,7 @@ export function CirclePanel() {
       <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
         <button
           type="button"
-          onClick={() => signIn()}
+          onClick={() => signInWithGoogle()}
           disabled={
             status === 'authenticating' ||
             status === 'awaitingPin' ||
@@ -69,6 +71,38 @@ export function CirclePanel() {
         >
           Continue with Google
         </button>
+        <form
+          style={{ display: 'flex', gap: 8 }}
+          onSubmit={(event) => {
+            event.preventDefault();
+            void signInWithEmail(email);
+          }}
+        >
+          <input
+            type="email"
+            value={email}
+            required
+            placeholder="you@example.com"
+            aria-label="Email address"
+            onChange={(event) => setEmail(event.target.value)}
+          />
+          <button
+            type="submit"
+            disabled={
+              !email ||
+              status === 'authenticating' ||
+              status === 'awaitingPin' ||
+              status === 'checking'
+            }
+          >
+            Continue with email
+          </button>
+        </form>
+        {status === 'authenticating' && activeMethod === 'email' && (
+          <button type="button" onClick={cancelSignIn}>
+            Cancel
+          </button>
+        )}
         {status === 'connected' && (
           <button type="button" onClick={signOut}>
             Sign out

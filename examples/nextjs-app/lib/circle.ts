@@ -37,24 +37,6 @@ export const getMissingServerConfig = (): MissingVar[] => {
     });
   }
 
-  // Not used server-side, but a missing App ID breaks the client half, and the
-  // health route is the one place a developer reliably looks.
-  if (!process.env.NEXT_PUBLIC_CIRCLE_APP_ID) {
-    missing.push({
-      id: 'appId',
-      envVar: 'NEXT_PUBLIC_CIRCLE_APP_ID',
-      scope: 'client',
-    });
-  }
-
-  if (!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID) {
-    missing.push({
-      id: 'googleClientId',
-      envVar: 'NEXT_PUBLIC_GOOGLE_CLIENT_ID',
-      scope: 'client',
-    });
-  }
-
   return missing;
 };
 
@@ -70,7 +52,7 @@ export class CircleApiError extends Error {
 
 type CircleFetchInit = {
   method?: 'GET' | 'POST';
-  /** The end user's 60-minute session token, minted by the Web SDK login. */
+  /** The end user's 14-day session token, minted by the Web SDK login. */
   userToken?: string;
   body?: Record<string, unknown>;
   searchParams?: Record<string, string | undefined>;

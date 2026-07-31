@@ -1,4 +1,7 @@
-import type { Configs } from '@circle-fin/w3s-pw-web-sdk/dist/src/types';
+import type {
+  Configs,
+  EmailLoginResult,
+} from '@circle-fin/w3s-pw-web-sdk/dist/src/types';
 
 import type { CircleBackendAdapter, CircleOptions, CircleWallet } from './types';
 import { toCircleBlockchain } from './chains';
@@ -45,6 +48,28 @@ const buildConfigs = (
 });
 
 /**
+ * Circle's current docs require an `email` object inside `loginConfigs`.
+ * Version 1.1.11 accepts it at runtime, although its published LoginConfigs
+ * declaration does not include the field yet.
+ */
+const buildEmailConfigs = (
+  circle: CircleOptions,
+  email: string,
+  deviceToken: string,
+  deviceEncryptionKey: string,
+  otpToken: string
+): Configs =>
+  ({
+    appSettings: { appId: circle.appId ?? '' },
+    loginConfigs: {
+      deviceToken,
+      deviceEncryptionKey,
+      otpToken,
+      email: { email },
+    },
+  } as Configs);
+
+/**
  * Starts Google sign-in. This navigates the browser away and does not return —
  * control resumes in {@link resumeGoogleLogin} after Google redirects back.
  */
@@ -67,6 +92,77 @@ export const beginGoogleLogin = async ({
   sdk.updateConfigs(buildConfigs(circle, deviceToken, deviceEncryptionKey));
 
   await sdk.performLogin(SocialLoginProvider.GOOGLE as never);
+};
+
+/**
+ * Sends an email OTP and opens Circle's hosted verification UI.
+ *
+ * Unlike social login this does not navigate away, so the complete authenticated
+ * session can be returned directly to the caller.
+ */
+export const beginEmailLogin = async ({
+  circle,
+  adapter,
+  chainId,
+  email,
+}: CircleLoginContext & { email: string }): Promise<CircleSession> => {
+  if (!adapter.requestEmailOtp) {
+    throw new Error(
+      'This Circle backend adapter does not implement `requestEmailOtp`. Add it to enable email authentication.'
+    );
+  }
+
+  const sdk = await getCircleSdk();
+  const deviceId = await sdk.getDeviceId();
+  const { deviceToken, deviceEncryptionKey, otpToken } =
+    await adapter.requestEmailOtp({ deviceId, email });
+
+  const configs = buildEmailConfigs(
+    circle,
+    email,
+    deviceToken,
+    deviceEncryptionKey,
+    otpToken
+  );
+
+  const session = await new Promise<CircleSession>((resolve, reject) => {
+    const onLoginComplete = (
+      error: { code?: number; message: string } | undefined,
+      result: EmailLoginResult | undefined
+    ) => {
+      if (error) {
+        reject(
+          new Error(
+            `Email verification failed${
+              error.code !== undefined ? ` (code ${error.code})` : ''
+            }: ${error.message}`
+          )
+        );
+        return;
+      }
+
+      if (!result?.userToken || !result.encryptionKey) {
+        reject(new Error('Email verification returned an incomplete result.'));
+        return;
+      }
+
+      resolve({
+        userToken: result.userToken,
+        encryptionKey: result.encryptionKey,
+        refreshToken: result.refreshToken,
+        email,
+        chainId,
+        createdAt: Date.now(),
+      });
+    };
+
+    getCircleSdk(configs, onLoginComplete)
+      .then((configuredSdk) => configuredSdk.verifyOtp())
+      .catch(reject);
+  });
+
+  saveSession(session);
+  return session;
 };
 
 /**
@@ -156,9 +252,8 @@ export const resumeGoogleLogin = async (
  * Returns the user's wallet on the requested chain, provisioning one if this is
  * their first visit.
  *
- * Provisioning is where the PIN gets set: `initializeUser` only hands back a
- * challenge, and the wallet does not exist until the user completes it in
- * Circle's hosted UI.
+ * `initializeUser` only hands back a challenge, and the wallet does not exist
+ * until the authenticated user approves it in Circle's hosted UI.
  */
 export const ensureWallet = async ({
   circle,

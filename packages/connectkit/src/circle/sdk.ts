@@ -110,10 +110,10 @@ export type CircleLoginResult = SocialLoginResult | EmailLoginResult;
 /**
  * Promise wrapper around `sdk.execute`.
  *
- * A challenge is how Circle gates every sensitive action behind the user's PIN:
- * the hosted UI opens, the user authenticates, and the result — a signature, a
- * transaction hash — arrives here. Anything other than COMPLETE is a failure,
- * including PENDING, which means the user dismissed the UI.
+ * A challenge is how Circle gates sensitive actions behind its hosted
+ * confirmation UI. The user authenticates or approves as required by their
+ * configured method, and the result — a signature or transaction hash — arrives
+ * here. Anything other than COMPLETE is a failure, including PENDING.
  */
 export const executeChallenge = async (
   sdk: W3SSdk,

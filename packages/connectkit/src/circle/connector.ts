@@ -56,8 +56,8 @@ export const circleConnector = ({ circle }: CircleConnectorParameters) =>
 
     /**
      * Every signing operation follows the same shape: ask the backend for a
-     * challenge, then hand it to the SDK, which opens Circle's hosted PIN UI
-     * and returns the result once the user authorises.
+     * challenge, then hand it to the SDK, which opens Circle's hosted
+     * confirmation UI and returns the result once the user authorises.
      */
     const runChallenge = async (
       request: (session: CircleSession) => Promise<{ challengeId: string }>
@@ -158,9 +158,15 @@ export const circleConnector = ({ circle }: CircleConnectorParameters) =>
           };
         }
 
-        // No usable session: start Google sign-in. This navigates away, so the
-        // promise below is not expected to settle — the app reconnects after
-        // the redirect, once the login flow has written a session.
+        if (!(circle.methods ?? ['google', 'email']).includes('google')) {
+          throw new Error(
+            'This Circle connector does not enable Google. Start email authentication with `useCircleLogin().signInWithEmail(email)` before connecting.'
+          );
+        }
+
+        // No usable session: preserve wagmi's legacy direct-connect behaviour
+        // by starting Google. Apps that offer multiple methods should use the
+        // ConnectKit method picker or the explicit useCircleLogin functions.
         await beginGoogleLogin({
           circle,
           adapter,

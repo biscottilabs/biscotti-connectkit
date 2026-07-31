@@ -1,13 +1,16 @@
 # Sign in with Circle
 
-Let users create a wallet with a Google account instead of a browser extension,
-backed by [Circle user-controlled wallets](https://developers.circle.com/wallets/user-controlled/build-a-wallet-app).
+Let users create a wallet with Google or an email one-time code instead of a
+browser extension, backed by
+[Circle user-controlled wallets](https://developers.circle.com/wallets/user-controlled/build-a-wallet-app).
 
 The result is a normal wagmi connector: `useAccount()`, `useSignMessage()`,
 `useSendTransaction()` and SIWE all work without special-casing.
 
 - **Opt-in.** Omit the `circle` option and nothing changes — no UI, no bundle cost.
-- **Google today.** Email OTP and PIN appear in the modal marked *coming soon*.
+- **Two authentication methods.** Google social login and email OTP share the
+  same wallet connector after authentication. PIN remains optional and marked
+  *coming soon* when included in `methods`.
 - **A backend is required.** Circle's API key must never reach the browser.
 
 ---
@@ -22,12 +25,18 @@ Three values, and it matters which side each one lives on.
 | Google **client ID** | Google Cloud → Credentials → OAuth 2.0 Client ID, type *Web application* | client (`NEXT_PUBLIC_…`) |
 | Circle **API key** | Circle Console → API Keys (use a **sandbox** key in development) | **server only** |
 
-Two steps people miss:
+Google setup:
 
-- The Google **client secret** is registered in the **Circle Console**, under social
-  login settings. It does not belong in your app's environment at all.
-- In Google Cloud, add your origin (e.g. `http://localhost:3000`) to that OAuth
+- Enable Google under Circle Console → Wallets → User Controlled → Configurator
+  → Authentication Methods → Social Logins, and enter the Web client ID.
+- In Google Cloud, add your origin (e.g. `http://localhost:3000`) to the OAuth
   client's **Authorized redirect URIs**, or Google rejects the sign-in.
+
+Email OTP setup:
+
+- Enable Email under Circle Console → Authentication Methods → Email.
+- Configure an SMTP provider there. For sandbox testing Circle documents
+  Mailtrap; use your transactional email provider in production.
 
 Sandbox API keys only work against **testnets**. Point `defaultChainId` at one.
 
@@ -63,6 +72,7 @@ export const config = createConfig(
     circle: {
       appId: process.env.NEXT_PUBLIC_CIRCLE_APP_ID,
       google: { clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID },
+      methods: ['google', 'email'],
       defaultChainId: baseSepolia.id,
     },
   })
@@ -81,6 +91,7 @@ automatically. If you build your wagmi config by hand, pass the same object as
 | `appId` | — | Circle App ID. |
 | `google.clientId` | — | Google OAuth client ID. |
 | `google.redirectUri` | `window.location.origin` | Must be registered in Google Cloud. |
+| `methods` | `['google', 'email']` | Authentication choices shown in the first Circle screen. |
 | `defaultChainId` | app's first chain | Chain to provision the wallet on. |
 | `feeLevel` | `MEDIUM` | `LOW` / `MEDIUM` / `HIGH`. Circle prices gas itself. |
 | `endpoints.basePath` | `/api/circle` | Where your backend routes live. |
@@ -98,6 +109,7 @@ copy it, or point `endpoints.basePath` at your own.
 | Route | Circle endpoint |
 | --- | --- |
 | `POST /api/circle/device-token` | `POST /users/social/token` |
+| `POST /api/circle/email-otp` | `POST /users/email/token` |
 | `POST /api/circle/initialize-user` | `POST /user/initialize` |
 | `POST /api/circle/wallets` | `GET /wallets` |
 | `POST /api/circle/sign-message` | `POST /user/sign/message` |
@@ -126,22 +138,22 @@ only *presence*, never values, so it is safe to leave enabled.
 ## How it works
 
 ```
-getDeviceId()  ->  /device-token  ->  performLogin(GOOGLE)
-                                          |
-                            full-page redirect to Google
-                                          |
-        userToken + encryptionKey  <-  redirect back
-                                          |
-                     /initialize-user  ->  challengeId
-                                          |
-                        sdk.execute()  ->  Circle's hosted PIN UI
-                                          |
-                              /wallets  ->  address
+Choose Google -> /device-token -> performLogin(GOOGLE) -> OAuth redirect
+                                                        |
+Choose Email  -> /email-otp   -> verifyOtp() -> hosted OTP window
+                                                        |
+                              userToken + encryptionKey
+                                                        |
+                                  /initialize-user -> challengeId
+                                                        |
+                                      sdk.execute() -> hosted wallet setup
+                                                        |
+                                           /wallets -> address
 ```
 
 Signing follows the same shape: the backend returns a `challengeId`, the SDK
-opens the PIN prompt, and the signature comes back on the challenge result — no
-polling.
+opens Circle's hosted confirmation UI, and the signature comes back on the
+challenge result — no polling.
 
 ## Limitations
 
@@ -154,7 +166,8 @@ These are properties of Circle's model, not gaps in the integration:
 - **Explicit gas is ignored** — set `feeLevel` instead.
 - **One wallet per chain** — switching chains selects a different Circle wallet,
   and fails if the user has none on the target chain.
-- **60-minute sessions** — the user token expires and sign-in must be repeated.
+- **14-day sessions** — this integration retains Circle's refresh token but does
+  not refresh automatically yet, so users authenticate again after expiry.
 
 Supported EVM chains are listed in
 [`src/circle/chains.ts`](../packages/connectkit/src/circle/chains.ts). Circle's
@@ -169,7 +182,16 @@ For a custom UI, skip the modal entirely:
 ```tsx
 import { useCircleLogin } from 'biscotti-finance-connectkit';
 
-const { status, issues, signIn, signOut, address } = useCircleLogin();
+const {
+  status,
+  issues,
+  signInWithGoogle,
+  signInWithEmail,
+  signOut,
+  address,
+} = useCircleLogin();
+
+await signInWithEmail('user@example.com');
 ```
 
 See [`examples/nextjs-app/app/circle-panel.tsx`](../examples/nextjs-app/app/circle-panel.tsx).

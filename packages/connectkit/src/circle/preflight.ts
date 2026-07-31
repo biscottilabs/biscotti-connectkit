@@ -38,7 +38,7 @@ export const preflightCircleConfig = (
     });
   }
 
-  const methods = circle.methods ?? ['google'];
+  const methods = circle.methods ?? ['google', 'email'];
 
   if (methods.includes('google') && !circle.google?.clientId) {
     issues.push({
@@ -52,17 +52,25 @@ export const preflightCircleConfig = (
     });
   }
 
-  // The client secret is registered with Circle, not with us. Flagging it as a
-  // reminder is worth more than staying silent, because the common mistake is
-  // to look for somewhere to put it in app config and give up.
   if (methods.includes('google') && circle.google?.clientId) {
     issues.push({
-      id: 'googleClientSecret',
+      id: 'googleConsoleConfig',
       scope: 'console',
       severity: 'warning',
       message:
-        'Confirm the Google client *secret* and your redirect URI are registered in the Circle Developer Console. The secret must never be added to app config or a NEXT_PUBLIC_ variable.',
+        'Confirm this Google Web client ID is enabled under Authentication Methods → Social Logins in Circle Console, and register the redirect URI in Google Cloud.',
       docsUrl: DOCS.google,
+    });
+  }
+
+  if (methods.includes('email')) {
+    issues.push({
+      id: 'emailConsoleConfig',
+      scope: 'console',
+      severity: 'warning',
+      message:
+        'Confirm Email authentication and SMTP delivery are configured under Authentication Methods → Email in Circle Console.',
+      docsUrl: DOCS.apiKey,
     });
   }
 

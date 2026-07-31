@@ -11,7 +11,8 @@ import {
 import type { CircleSession } from './session';
 
 /**
- * Circle exposes no EIP-1193 provider — it has a REST API and a hosted PIN UI.
+ * Circle exposes no EIP-1193 provider — it has a REST API and hosted
+ * authentication/confirmation UI.
  * This shim supplies one, which is what lets a Circle wallet behave like any
  * other wagmi connector.
  *

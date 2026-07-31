@@ -1,13 +1,12 @@
 import type { CircleChainMap } from './chains';
 
-/**
- * Login methods Circle exposes for user-controlled wallets. Only `google` is
- * implemented today; the rest are declared so the option type is stable and
- * enabling one later is not a breaking change.
- */
+/** Login methods Circle exposes for user-controlled wallets. */
 export type CircleLoginMethod = 'google' | 'email' | 'pin' | 'facebook' | 'apple';
 
-export const CIRCLE_IMPLEMENTED_METHODS: CircleLoginMethod[] = ['google'];
+export const CIRCLE_IMPLEMENTED_METHODS: CircleLoginMethod[] = [
+  'google',
+  'email',
+];
 
 /**
  * Where a piece of configuration belongs. Reported alongside preflight issues so
@@ -65,6 +64,10 @@ export type CircleDeviceTokenResult = {
   deviceEncryptionKey: string;
 };
 
+export type CircleEmailOtpResult = CircleDeviceTokenResult & {
+  otpToken: string;
+};
+
 export type CircleChallengeResponse = {
   challengeId: string;
 };
@@ -83,6 +86,11 @@ export interface CircleBackendAdapter {
   createDeviceToken(input: {
     deviceId: string;
   }): Promise<CircleDeviceTokenResult>;
+
+  requestEmailOtp?(input: {
+    deviceId: string;
+    email: string;
+  }): Promise<CircleEmailOtpResult>;
 
   initializeUser(input: {
     userToken: string;
@@ -128,8 +136,8 @@ export type CircleOptions = {
   appId?: string;
 
   /**
-   * Google OAuth client id. Public by design. The matching client *secret*
-   * belongs in the Circle Developer Console and must never appear here.
+   * Google OAuth Web client id. Public by design. Enable the same client ID in
+   * Circle Console; no Google credential secret belongs in browser config.
    */
   google?: {
     clientId?: string;
@@ -139,7 +147,10 @@ export type CircleOptions = {
     selectAccountPrompt?: boolean;
   };
 
-  /** Defaults to `['google']`. Unimplemented methods render as "coming soon". */
+  /**
+   * Authentication choices shown by ConnectKit. Defaults to
+   * `['google', 'email']`. Unimplemented methods render as "coming soon".
+   */
   methods?: CircleLoginMethod[];
 
   endpoints?: CircleEndpointConfig;

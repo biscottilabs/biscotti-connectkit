@@ -17,7 +17,7 @@ type Body = {
 /**
  * Backs `personal_sign`. Returns a challenge; the signature itself comes back
  * to the browser from the Web SDK's `execute()` callback once the user has
- * entered their PIN — it never passes through this server.
+ * approved the request — it never passes through this server.
  */
 export const POST = circleRoute<Body>(async (body) => {
   const userToken = requireUserToken(body);

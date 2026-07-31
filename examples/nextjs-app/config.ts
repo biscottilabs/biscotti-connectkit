@@ -14,6 +14,7 @@ export const config = createConfig(
     circle: {
       appId: process.env.NEXT_PUBLIC_CIRCLE_APP_ID,
       google: { clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID },
+      methods: ['google', 'email'],
       defaultChainId: baseSepolia.id,
     },
   })

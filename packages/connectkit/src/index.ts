@@ -42,6 +42,7 @@ export type {
   CircleBackendAdapter,
   CircleEndpointConfig,
   CircleWallet,
+  CircleEmailOtpResult,
   CircleBlockchain,
   CircleChainMap,
   CircleHealthReport,

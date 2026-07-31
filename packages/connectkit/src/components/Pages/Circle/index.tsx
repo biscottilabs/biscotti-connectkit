@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import useLocales from '../../../hooks/useLocales';
 import { useConnect } from '../../../hooks/useConnect';
@@ -14,6 +14,11 @@ import { Spinner } from '../../Common/Spinner';
 
 import {
   Container,
+  BackButton,
+  EmailForm,
+  EmailInput,
+  EmailLabel,
+  EmailSubmit,
   Footnote,
   Issue,
   IssueHeader,
@@ -33,14 +38,39 @@ import { CircleLogo, GoogleLogo, MailIcon, PinIcon } from '../../../assets/circl
 import { useCircleLogin } from '../../../circle/useCircleLogin';
 import { CIRCLE_CONNECTOR_ID } from '../../../circle/connector';
 import type { CircleConfigScope } from '../../../circle/types';
+import { useCircleOptions } from '../../../circle/useCircleOptions';
+import { hasBlockingIssues } from '../../../circle/preflight';
+import { useContext as useConnectKitContext } from '../../ConnectKit';
 
 const CircleSignIn: React.FC = () => {
   const locales = useLocales({});
+  const { triggerResize } = useConnectKitContext();
   const { connect } = useConnect();
   const connectors = useConnectors();
+  const circle = useCircleOptions();
+  const methods = circle?.methods ?? ['google', 'email'];
+  const [selectedMethod, setSelectedMethod] = useState<'email' | null>(null);
+  const [email, setEmail] = useState('');
 
-  const { status, issues, canShowDiagnostics, error, signIn, address } =
-    useCircleLogin();
+  const {
+    status,
+    issues,
+    canShowDiagnostics,
+    error,
+    activeMethod,
+    signInWithGoogle,
+    signInWithEmail,
+    cancelSignIn,
+    address,
+  } = useCircleLogin();
+
+  // Circle changes between several views without changing the ConnectKit route.
+  // Ask the modal to remeasure after those views render so a short loading
+  // panel cannot leave the diagnostics or email form clipped.
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(triggerResize);
+    return () => window.cancelAnimationFrame(frame);
+  }, [status, selectedMethod, issues.length, error?.message]);
 
   // Once Circle has provisioned a wallet, hand it to wagmi so the rest of the
   // app sees a normal connected account. Guarded because `connect` would
@@ -65,7 +95,10 @@ const CircleSignIn: React.FC = () => {
       ? locales.circleScreen_scope_console
       : locales.circleScreen_scope_client;
 
-  if (status === 'unconfigured' || (status === 'error' && issues.length > 0)) {
+  if (
+    status === 'unconfigured' ||
+    (status === 'error' && hasBlockingIssues(issues))
+  ) {
     // Production users must never see environment-variable names, so the
     // itemised list is gated on debugMode / non-production.
     if (!canShowDiagnostics) {
@@ -81,42 +114,72 @@ const CircleSignIn: React.FC = () => {
 
     return (
       <PageContent>
-        <ModalContent style={{ paddingBottom: 12 }}>
-          <ModalH1 $small>{locales.circleScreen_misconfigured_heading}</ModalH1>
-          <ModalBody>{locales.circleScreen_misconfigured_p}</ModalBody>
-        </ModalContent>
-        <IssueList>
-          {issues.map((issue) => (
-            <Issue key={`${issue.id}-${issue.scope}`}>
-              <IssueHeader>
-                <IssueKey>{issue.envVar ?? issue.id}</IssueKey>
-                <IssueScope $severity={issue.severity}>
-                  {scopeLabel(issue.scope)}
-                </IssueScope>
-              </IssueHeader>
-              <IssueMessage>{issue.message}</IssueMessage>
-              {issue.docsUrl && (
-                <IssueLink
-                  href={issue.docsUrl}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                >
-                  {locales.learnMore}
-                </IssueLink>
-              )}
-            </Issue>
-          ))}
-        </IssueList>
+        <Container>
+          <ModalContent style={{ padding: 0 }}>
+            <ModalH1 $small>
+              {locales.circleScreen_misconfigured_heading}
+            </ModalH1>
+            <ModalBody>{locales.circleScreen_misconfigured_p}</ModalBody>
+          </ModalContent>
+          <IssueList>
+            {issues.map((issue) => (
+              <Issue key={`${issue.id}-${issue.scope}`}>
+                <IssueHeader>
+                  <IssueKey>{issue.envVar ?? issue.id}</IssueKey>
+                  <IssueScope $severity={issue.severity}>
+                    {scopeLabel(issue.scope)}
+                  </IssueScope>
+                </IssueHeader>
+                <IssueMessage>{issue.message}</IssueMessage>
+                {issue.docsUrl && (
+                  <IssueLink
+                    href={issue.docsUrl}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                  >
+                    {locales.learnMore}
+                  </IssueLink>
+                )}
+              </Issue>
+            ))}
+          </IssueList>
+        </Container>
       </PageContent>
     );
   }
 
-  if (status === 'authenticating' || status === 'checking') {
+  if (status === 'checking') {
     return (
       <PageContent>
         <ModalContent style={{ gap: 16 }}>
           <Spinner />
-          <ModalBody>{locales.circleScreen_redirecting}</ModalBody>
+          <ModalBody>{locales.circleScreen_checking}</ModalBody>
+        </ModalContent>
+      </PageContent>
+    );
+  }
+
+  if (status === 'authenticating') {
+    return (
+      <PageContent>
+        <ModalContent style={{ gap: 16 }}>
+          <Spinner />
+          <ModalBody>
+            {activeMethod === 'email'
+              ? locales.circleScreen_email_verifying
+              : locales.circleScreen_redirecting}
+          </ModalBody>
+          {activeMethod === 'email' && (
+            <BackButton
+              type="button"
+              onClick={() => {
+                cancelSignIn();
+                setSelectedMethod(null);
+              }}
+            >
+              {locales.circleScreen_cancelEmail}
+            </BackButton>
+          )}
         </ModalContent>
       </PageContent>
     );
@@ -145,6 +208,63 @@ const CircleSignIn: React.FC = () => {
     );
   }
 
+  const errorMessage =
+    error && status === 'error' ? (
+      <ModalBody style={{ color: 'var(--ck-body-color-danger, #C81E1E)' }}>
+        {canShowDiagnostics
+          ? error.message
+          : locales.circleScreen_unavailable_p}
+      </ModalBody>
+    ) : null;
+
+  if (selectedMethod === 'email') {
+    const submitEmail = (event: React.FormEvent) => {
+      event.preventDefault();
+      void signInWithEmail(email);
+    };
+
+    return (
+      <PageContent>
+        <Container>
+          <BackButton type="button" onClick={() => setSelectedMethod(null)}>
+            {locales.circleScreen_chooseAnotherMethod}
+          </BackButton>
+          <ModalContent style={{ padding: '0 0 8px', textAlign: 'left' }}>
+            <ModalH1 $small>{locales.circleScreen_email_h1}</ModalH1>
+            <ModalBody>{locales.circleScreen_email_p}</ModalBody>
+          </ModalContent>
+
+          <EmailForm onSubmit={submitEmail}>
+            <EmailLabel htmlFor="circle-email">
+              {locales.circleScreen_email_label}
+            </EmailLabel>
+            <EmailInput
+              id="circle-email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              autoFocus
+              required
+              value={email}
+              placeholder="you@example.com"
+              onChange={(event) => setEmail(event.target.value)}
+            />
+            <EmailSubmit type="submit" disabled={!email.trim()}>
+              {locales.circleScreen_email_submit}
+            </EmailSubmit>
+          </EmailForm>
+
+          {errorMessage}
+
+          <Footnote>
+            <CircleLogo width={14} height={14} />
+            {locales.circleScreen_securedByCircle}
+          </Footnote>
+        </Container>
+      </PageContent>
+    );
+  }
+
   return (
     <PageContent>
       <Container>
@@ -154,44 +274,45 @@ const CircleSignIn: React.FC = () => {
         </ModalContent>
 
         <MethodList>
-          <MethodButton type="button" onClick={() => signIn()}>
-            <MethodIcon>
-              <GoogleLogo />
-            </MethodIcon>
-            <MethodLabel>{locales.circleScreen_continueWithGoogle}</MethodLabel>
-          </MethodButton>
+          {methods.includes('google') && (
+            <MethodButton type="button" onClick={() => signInWithGoogle()}>
+              <MethodIcon>
+                <GoogleLogo />
+              </MethodIcon>
+              <MethodLabel>
+                {locales.circleScreen_continueWithGoogle}
+              </MethodLabel>
+            </MethodButton>
+          )}
 
-          {/* Circle supports both, and the connector is built to accept them;
-              only the client-side entry points remain. Shown rather than hidden
-              so the roadmap is visible to users and developers alike. */}
-          <MethodButton type="button" $disabled disabled>
-            <MethodIcon>
-              <MailIcon />
-            </MethodIcon>
-            <MethodLabel>
-              {locales.circleScreen_continueWithEmail}
-              <MethodHint>{locales.circleScreen_comingSoon}</MethodHint>
-            </MethodLabel>
-          </MethodButton>
+          {methods.includes('email') && (
+            <MethodButton
+              type="button"
+              onClick={() => setSelectedMethod('email')}
+            >
+              <MethodIcon>
+                <MailIcon />
+              </MethodIcon>
+              <MethodLabel>
+                {locales.circleScreen_continueWithEmail}
+              </MethodLabel>
+            </MethodButton>
+          )}
 
-          <MethodButton type="button" $disabled disabled>
-            <MethodIcon>
-              <PinIcon />
-            </MethodIcon>
-            <MethodLabel>
-              {locales.circleScreen_continueWithPin}
-              <MethodHint>{locales.circleScreen_comingSoon}</MethodHint>
-            </MethodLabel>
-          </MethodButton>
+          {methods.includes('pin') && (
+            <MethodButton type="button" $disabled disabled>
+              <MethodIcon>
+                <PinIcon />
+              </MethodIcon>
+              <MethodLabel>
+                {locales.circleScreen_continueWithPin}
+                <MethodHint>{locales.circleScreen_comingSoon}</MethodHint>
+              </MethodLabel>
+            </MethodButton>
+          )}
         </MethodList>
 
-        {error && status === 'error' && (
-          <ModalBody style={{ color: 'var(--ck-body-color-danger, #C81E1E)' }}>
-            {canShowDiagnostics
-              ? error.message
-              : locales.circleScreen_unavailable_p}
-          </ModalBody>
-        )}
+        {errorMessage}
 
         <Footnote>
           <CircleLogo width={14} height={14} />

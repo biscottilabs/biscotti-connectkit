@@ -7,6 +7,7 @@ export type {
   CircleBackendAdapter,
   CircleWallet,
   CircleDeviceTokenResult,
+  CircleEmailOtpResult,
   CircleChallengeResponse,
   CircleHealthReport,
 } from './types';
@@ -45,6 +46,7 @@ export {
 export type { CircleSdk, CircleChallengeResult } from './sdk';
 
 export {
+  beginEmailLogin,
   beginGoogleLogin,
   resumeGoogleLogin,
   ensureWallet,

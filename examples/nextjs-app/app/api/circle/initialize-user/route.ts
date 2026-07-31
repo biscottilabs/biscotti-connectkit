@@ -16,9 +16,9 @@ type Body = {
 /**
  * Step 2: provision the user and their first wallet.
  *
- * Returns a `challengeId` rather than a wallet — the user still has to set a
- * PIN, which happens in Circle's hosted UI when the Web SDK executes this
- * challenge. The wallet only exists once that completes.
+ * Returns a `challengeId` rather than a wallet. The authenticated user approves
+ * wallet creation in Circle's hosted UI when the Web SDK executes this
+ * challenge; the wallet only exists once that completes.
  */
 export const POST = circleRoute<Body>(async (body) => {
   const userToken = requireUserToken(body);
