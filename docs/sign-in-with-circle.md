@@ -133,6 +133,22 @@ If `environments` declares both, `environment` is required.
 | `feeLevel` | | `MEDIUM` | Circle ignores explicit gas. |
 | `chains` | | | Add or override Circle chain identifiers. |
 | `name` | | `Sign in with Circle` | Wallet list label. |
+| `storage` | | `session` | `session`, `local`, or any object with `getItem`, `setItem`, `removeItem`. |
+| `appearance` | | | `themeColor`, `localizations`, `resources`, `customLinks` for Circle's hosted screens. |
+| `onLogin`, `onWallet`, `onSignOut`, `onError` | | | Event callbacks. See below. |
+
+### Events
+
+```ts
+circle: {
+  onLogin: ({ environment, method, email }) => analytics.track('circle_login', { method }),
+  onWallet: ({ wallet, created }) => created && analytics.track('circle_wallet_created'),
+  onSignOut: ({ environment }) => {},
+  onError: (error, { environment }) => reportError(error),
+}
+```
+
+A callback that throws is logged and does not interrupt sign-in.
 
 ## 5. Backend
 
@@ -195,6 +211,8 @@ The handler:
 | `POST /device-token` | `POST /users/social/token` |
 | `POST /email-otp` | `POST /users/email/token` |
 | `POST /initialize-user` | `POST /user/initialize` |
+| `POST /create-wallet` | `POST /user/wallets` |
+| `POST /refresh-token` | `POST /users/token/refresh` |
 | `POST /wallets` | `GET /wallets` |
 | `POST /sign-message` | `POST /user/sign/message` |
 | `POST /sign-typed-data` | `POST /user/sign/typedData` |
@@ -215,6 +233,9 @@ Clicking the Circle button runs a preflight check:
   with the variable name and whether it belongs in client env, server env, or a
   console.
 - **Production:** a generic "temporarily unavailable" message.
+
+Variable names are shown without a framework prefix (`CIRCLE_TESTNET_APP_ID`,
+`GOOGLE_CLIENT_ID`); add `NEXT_PUBLIC_`, `VITE_` or your framework's equivalent.
 
 Preflight catches a missing App ID or Google client ID, an invalid or ambiguous
 environment, a default chain from the other environment, and a default chain
@@ -242,9 +263,18 @@ Signing follows the same shape: the backend returns a `challengeId`, the SDK
 opens Circle's confirmation UI, and the signature comes back on the challenge
 result.
 
-Sessions are stored in `sessionStorage` per environment and App ID. Changing
-environment shows that environment's session (or none) without deleting the
-other one.
+Sessions are stored per environment and App ID (in `sessionStorage` unless
+`storage` says otherwise). Changing environment shows that environment's session
+(or none) without deleting the other one.
+
+A user's first wallet comes from `/initialize-user`. Wallets on further chains
+come from `/create-wallet`, which ConnectKit uses automatically when the user
+already has a wallet, including when they switch to a chain where they have
+none. Either way the user approves the new wallet in Circle's hosted UI.
+
+The user token lasts 14 days. Once it is a day old, ConnectKit renews it through
+`/refresh-token` before the next sign-in check or signature, so active users stay
+signed in. If Circle rejects the token, the session is cleared.
 
 ## Limitations
 
@@ -253,10 +283,11 @@ These come from Circle's model:
 - **No `eth_sign`** and **no `eth_signTransaction`**.
 - **No contract deployment**: transactions need a `to` address.
 - **Explicit gas is ignored**: set `feeLevel`.
-- **One wallet per chain**: switching chains selects another Circle wallet and
-  fails if the user has none there. Switching to a chain in the other
+- **One wallet per chain**: switching chains selects another Circle wallet,
+  creating it (with user approval) if needed. Switching to a chain in the other
   environment always fails; that is a different Circle user.
-- **14-day sessions**: the refresh token is stored but not used yet.
+- **Inactive users re-authenticate**: a token not refreshed within 14 days
+  expires.
 - **Generic `EVM` / `EVM-TESTNET` chains** support signing only; Circle does not
   broadcast on them.
 

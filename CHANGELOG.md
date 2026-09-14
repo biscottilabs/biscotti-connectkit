@@ -10,6 +10,13 @@
   Includes an `authorize` hook.
 - `circle.accountType` (`EOA` or `SCA`), `useCircleConfig`, `useCircleLogin().environment`,
   and Monad (`MONAD`, `MONAD-TESTNET`) chain mappings.
+- Wallets on additional chains: users who already have a Circle wallet get new ones via
+  `POST /user/wallets` (`createWallet` adapter method, `create-wallet` route), including
+  when switching to a chain where they have none.
+- Automatic user token refresh once a session is a day old (`refreshUserToken` adapter
+  method, `refresh-token` route).
+- `circle.storage` (`session`, `local`, or custom), `circle.appearance` for Circle's hosted
+  screens, and `onLogin`, `onWallet`, `onSignOut`, `onError` callbacks.
 - Preflight errors for an invalid or ambiguous environment, a default chain from the
   other environment, and a default chain missing from the wagmi `chains`.
 
@@ -17,12 +24,16 @@
 
 - `preflightCircleConfig(circle, appChainIds)` takes the app's chain ids instead of a
   single chain id.
-- `readCircleSession` takes a `{ environment, appId }` scope. `clearCircleSession()`
-  with no argument clears both environments.
+- `readCircleSession` takes a `{ environment, appId, storage }` scope.
+  `clearCircleSession({ environment?, storage? })` with no environment clears both.
+- Diagnostics name variables without a framework prefix, e.g. `CIRCLE_TESTNET_APP_ID`
+  instead of `NEXT_PUBLIC_CIRCLE_TESTNET_APP_ID`.
 
 ## Fixed
 
 - Circle challenges run after a page refresh now set the App ID on the SDK first.
+- Signing in with a chain other than the user's first wallet no longer fails with
+  "user already initialized" (155106).
 
 # 0.0.1
 
