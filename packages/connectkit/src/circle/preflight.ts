@@ -21,10 +21,14 @@ const DOCS = {
   chains: 'https://developers.circle.com/wallets/supported-blockchains',
 };
 
+// Framework-neutral names: apps add their own public prefix (NEXT_PUBLIC_, VITE_).
 const clientEnvVar = (circle: ResolvedCircleConfig, name: string) =>
   circle.usesEnvironments
-    ? `NEXT_PUBLIC_CIRCLE_${circle.environment.toUpperCase()}_${name}`
-    : `NEXT_PUBLIC_CIRCLE_${name}`;
+    ? `CIRCLE_${circle.environment.toUpperCase()}_${name}`
+    : `CIRCLE_${name}`;
+
+const PUBLIC_PREFIX_HINT =
+  "Expose it to the browser with your framework's public prefix, such as NEXT_PUBLIC_ or VITE_.";
 
 const serverKeyEnvVar = (environment?: CircleEnvironment) =>
   environment
@@ -52,7 +56,7 @@ export const preflightCircleConfig = (
   ) {
     issues.push({
       id: 'invalidEnvironment',
-      envVar: 'NEXT_PUBLIC_CIRCLE_ENVIRONMENT',
+      envVar: 'CIRCLE_ENVIRONMENT',
       scope: 'client',
       severity: 'error',
       message: `\`circle.environment\` must be "testnet" or "mainnet", not "${String(
@@ -81,7 +85,7 @@ export const preflightCircleConfig = (
   ) {
     issues.push({
       id: 'ambiguousEnvironment',
-      envVar: 'NEXT_PUBLIC_CIRCLE_ENVIRONMENT',
+      envVar: 'CIRCLE_ENVIRONMENT',
       scope: 'client',
       severity: 'error',
       message:
@@ -96,7 +100,7 @@ export const preflightCircleConfig = (
       envVar: clientEnvVar(circle, 'APP_ID'),
       scope: 'client',
       severity: 'error',
-      message: `Circle App ID for ${label} is missing. Copy it from Circle Console (${label}) → Wallets → User Controlled → Configurator.`,
+      message: `Circle App ID for ${label} is missing. Copy it from Circle Console (${label}) → Wallets → User Controlled → Configurator. ${PUBLIC_PREFIX_HINT}`,
       docsUrl: DOCS.appId,
     });
   }
@@ -106,11 +110,10 @@ export const preflightCircleConfig = (
   if (methods.includes('google') && !circle.google.clientId) {
     issues.push({
       id: 'googleClientId',
-      envVar: 'NEXT_PUBLIC_GOOGLE_CLIENT_ID',
+      envVar: 'GOOGLE_CLIENT_ID',
       scope: 'client',
       severity: 'error',
-      message:
-        'Google OAuth client ID is missing. Create an OAuth 2.0 Web Client in Google Cloud and pass it as `circle.google.clientId`.',
+      message: `Google OAuth client ID is missing. Create an OAuth 2.0 Web Client in Google Cloud and pass it as \`circle.google.clientId\`. ${PUBLIC_PREFIX_HINT}`,
       docsUrl: DOCS.google,
     });
   }

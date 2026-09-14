@@ -4,10 +4,12 @@ import { useConfig } from 'wagmi';
 import { useContext } from '../components/ConnectKit';
 import { resolveBackendAdapter } from './backend';
 import type { CircleEnvironment } from './chains';
+import { emitCircleEvent } from './config';
 import {
   beginEmailLogin,
   beginGoogleLogin,
   ensureWallet,
+  refreshSessionIfStale,
   resumeGoogleLogin,
   sessionScope,
 } from './login';
@@ -121,8 +123,13 @@ export const useCircleLogin = (): UseCircleLoginResult => {
       context.log?.('[circle] ', asError);
       setError(asError);
       setStatus('error');
+      if (circle) {
+        emitCircleEvent(() =>
+          circle.events.onError?.(asError, { environment: circle.environment })
+        );
+      }
     },
-    [context]
+    [circle, context]
   );
 
   /** Preflight + backend health, merged into one issue list. */
@@ -211,14 +218,22 @@ export const useCircleLogin = (): UseCircleLoginResult => {
         return;
       }
 
-      const stored = readSession(sessionScope(circle!));
+      const saved = readSession(sessionScope(circle!));
+      const stored = saved
+        ? await refreshSessionIfStale({
+            circle: circle!,
+            adapter: adapter!,
+            session: saved,
+          })
+        : null;
+      if (cancelled) return;
       if (stored) {
         // The stored wallet's chain was removed from the app.
         if (
           stored.chainId !== undefined &&
           !chains.some((chain) => chain.id === stored.chainId)
         ) {
-          clearSession(circle!.environment);
+          clearSession(sessionScope(circle!));
           resetCircleSdk();
           setSession(null);
           setWallet(null);
@@ -330,14 +345,22 @@ export const useCircleLogin = (): UseCircleLoginResult => {
 
   const signOut = useCallback(() => {
     authAttemptRef.current += 1;
-    clearSession(circle?.environment);
+    if (circle) {
+      const hadSession = readSession(sessionScope(circle)) !== null;
+      clearSession(sessionScope(circle));
+      if (hadSession) {
+        emitCircleEvent(() =>
+          circle.events.onSignOut?.({ environment: circle.environment })
+        );
+      }
+    }
     resetCircleSdk();
     setSession(null);
     setWallet(null);
     setError(null);
     setActiveMethod(null);
     setStatus(enabled ? 'ready' : 'disabled');
-  }, [circle?.environment, enabled]);
+  }, [circle, enabled]);
 
   return {
     status,

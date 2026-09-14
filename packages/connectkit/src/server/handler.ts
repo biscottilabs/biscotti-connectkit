@@ -26,6 +26,8 @@ export type CircleRoute =
   | 'device-token'
   | 'email-otp'
   | 'initialize-user'
+  | 'create-wallet'
+  | 'refresh-token'
   | 'wallets'
   | 'sign-message'
   | 'sign-typed-data'
@@ -212,6 +214,8 @@ const ROUTES: readonly CircleRoute[] = [
   'device-token',
   'email-otp',
   'initialize-user',
+  'create-wallet',
+  'refresh-token',
   'wallets',
   'sign-message',
   'sign-typed-data',
@@ -221,6 +225,8 @@ const ROUTES: readonly CircleRoute[] = [
 
 const USER_ROUTES: readonly CircleRoute[] = [
   'initialize-user',
+  'create-wallet',
+  'refresh-token',
   'wallets',
   'sign-message',
   'sign-typed-data',
@@ -430,6 +436,50 @@ export const createCircleHandler = (options: CircleHandlerOptions) => {
         }
       );
       return { challengeId: data.challengeId };
+    },
+
+    // For users who already have a wallet on another chain.
+    'create-wallet': async (environment, body) => {
+      const blockchain = requireString(body, 'blockchain');
+      requireBlockchainIn(blockchain, environment);
+
+      const data = await callCircle<{ challengeId: string }>(
+        environment,
+        '/user/wallets',
+        {
+          method: 'POST',
+          userToken: requireString(body, 'userToken'),
+          body: {
+            idempotencyKey: randomId(),
+            blockchains: [blockchain],
+            accountType:
+              optionalEnum(body, 'accountType', ['EOA', 'SCA'] as const) ??
+              'EOA',
+          },
+        }
+      );
+      return { challengeId: data.challengeId };
+    },
+
+    'refresh-token': async (environment, body) => {
+      const data = await callCircle<{
+        userToken: string;
+        encryptionKey?: string;
+        refreshToken?: string;
+      }>(environment, '/users/token/refresh', {
+        method: 'POST',
+        userToken: requireString(body, 'userToken'),
+        body: {
+          idempotencyKey: randomId(),
+          refreshToken: requireString(body, 'refreshToken'),
+          deviceId: requireString(body, 'deviceId'),
+        },
+      });
+      return {
+        userToken: data.userToken,
+        encryptionKey: data.encryptionKey,
+        refreshToken: data.refreshToken,
+      };
     },
 
     // POST so the user token never lands in a query string.

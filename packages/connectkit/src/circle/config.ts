@@ -6,12 +6,15 @@ import {
 } from './chains';
 import type {
   CircleAccountType,
+  CircleAppearance,
   CircleBackendAdapter,
   CircleEndpointConfig,
+  CircleEvents,
   CircleFeeLevel,
   CircleGoogleOptions,
   CircleLoginMethod,
   CircleOptions,
+  CircleStorageOption,
 } from './types';
 
 export type CircleEnvironmentSource =
@@ -35,6 +38,9 @@ export type ResolvedCircleConfig = {
   name: string;
   feeLevel: CircleFeeLevel;
   accountType: CircleAccountType;
+  storage?: CircleStorageOption;
+  appearance?: CircleAppearance;
+  events: CircleEvents;
 };
 
 export const CIRCLE_DEFAULT_METHODS: CircleLoginMethod[] = ['google', 'email'];
@@ -103,5 +109,23 @@ export const resolveCircleConfig = (
     name: circle.name ?? 'Sign in with Circle',
     feeLevel: circle.feeLevel ?? 'MEDIUM',
     accountType: scoped.accountType ?? circle.accountType ?? 'EOA',
+    storage: circle.storage,
+    appearance: circle.appearance,
+    events: {
+      onLogin: circle.onLogin,
+      onWallet: circle.onWallet,
+      onSignOut: circle.onSignOut,
+      onError: circle.onError,
+    },
   };
+};
+
+/** App callbacks must not break the Circle flow. */
+export const emitCircleEvent = (handler: (() => void) | undefined) => {
+  if (!handler) return;
+  try {
+    handler();
+  } catch (error) {
+    console.error('[circle] event handler threw', error);
+  }
 };

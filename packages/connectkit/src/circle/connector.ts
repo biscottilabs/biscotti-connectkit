@@ -3,8 +3,13 @@ import { formatEther, getAddress, isHex, type Address, type Chain } from 'viem';
 
 import { resolveBackendAdapter } from './backend';
 import { environmentOfBlockchain, toCircleBlockchain } from './chains';
-import { resolveCircleConfig } from './config';
-import { beginGoogleLogin, sessionScope } from './login';
+import { emitCircleEvent, resolveCircleConfig } from './config';
+import {
+  beginGoogleLogin,
+  ensureWallet,
+  refreshSessionIfStale,
+  sessionScope,
+} from './login';
 import {
   createCircleProvider,
   CircleNotConnectedError,
@@ -14,13 +19,12 @@ import {
   executeChallenge,
   extractSignature,
   extractTxHash,
-  getCircleSdk,
+  getCircleSdkFor,
   resetCircleSdk,
 } from './sdk';
 import {
   clearSession,
   readSession as readScopedSession,
-  updateSession,
   type CircleSession,
 } from './session';
 import type { CircleOptions } from './types';
@@ -60,6 +64,18 @@ export const circleConnector = ({ circle }: CircleConnectorParameters) =>
     const currentChainId = (): number =>
       readSession()?.chainId ?? fallbackChainId();
 
+    const activeSession = async (): Promise<CircleSession | null> => {
+      const stored = readSession();
+      if (!stored) return null;
+      const session = await refreshSessionIfStale({
+        circle: resolved,
+        adapter,
+        session: stored,
+      });
+      if (!session) config.emitter.emit('disconnect');
+      return session;
+    };
+
     /**
      * Every signing operation follows the same shape: ask the backend for a
      * challenge, then hand it to the SDK, which opens Circle's hosted
@@ -68,12 +84,12 @@ export const circleConnector = ({ circle }: CircleConnectorParameters) =>
     const runChallenge = async (
       request: (session: CircleSession) => Promise<{ challengeId: string }>
     ) => {
-      const session = readSession();
+      const session = await activeSession();
       if (!session?.walletId) throw new CircleNotConnectedError();
 
       const { challengeId } = await request(session);
 
-      const sdk = await getCircleSdk(resolved.appId ?? '');
+      const sdk = await getCircleSdkFor(resolved);
       sdk.setAuthentication({
         userToken: session.userToken,
         encryptionKey: session.encryptionKey,
@@ -198,8 +214,14 @@ export const circleConnector = ({ circle }: CircleConnectorParameters) =>
       },
 
       async disconnect() {
-        clearSession(resolved.environment);
+        const hadSession = readSession() !== null;
+        clearSession(scope);
         resetCircleSdk();
+        if (hadSession) {
+          emitCircleEvent(() =>
+            resolved.events.onSignOut?.({ environment: resolved.environment })
+          );
+        }
       },
 
       async getAccounts() {
@@ -227,7 +249,7 @@ export const circleConnector = ({ circle }: CircleConnectorParameters) =>
           throw new Error(`Chain ${chainId} is not configured in this app.`);
         }
 
-        const session = readSession();
+        const session = await activeSession();
         if (!session) {
           throw new Error('Sign in with Circle before switching chains.');
         }
@@ -250,22 +272,13 @@ export const circleConnector = ({ circle }: CircleConnectorParameters) =>
           );
         }
 
-        // A Circle wallet belongs to exactly one blockchain, so switching chains
-        // means switching wallets, not re-pointing the existing one.
-        const target = (
-          await adapter.listWallets({ userToken: session.userToken })
-        ).find((wallet) => wallet.blockchain === blockchain);
-
-        if (!target) {
-          throw new Error(
-            `You do not have a Circle wallet on ${chain.name} yet.`
-          );
-        }
-
-        updateSession(scope, {
-          walletId: target.id,
-          address: target.address,
+        // A Circle wallet belongs to one blockchain, so switching chains means
+        // switching wallets. The user approves creating one if it is missing.
+        const target = await ensureWallet({
+          circle: resolved,
+          adapter,
           chainId,
+          session,
         });
 
         config.emitter.emit('change', {
@@ -291,7 +304,7 @@ export const circleConnector = ({ circle }: CircleConnectorParameters) =>
       },
 
       onDisconnect() {
-        clearSession(resolved.environment);
+        clearSession(scope);
         config.emitter.emit('disconnect');
       },
     };

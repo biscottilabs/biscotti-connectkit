@@ -1,3 +1,10 @@
+import type {
+  CustomLinks,
+  Localizations,
+  Resources,
+  ThemeColor,
+} from '@circle-fin/w3s-pw-web-sdk/dist/src/types';
+
 import type { CircleChainMap, CircleEnvironment } from './chains';
 
 export type CircleLoginMethod = 'google' | 'email' | 'pin' | 'facebook' | 'apple';
@@ -60,6 +67,12 @@ export type CircleChallengeResponse = {
   challengeId: string;
 };
 
+export type CircleRefreshTokenResult = {
+  userToken: string;
+  encryptionKey?: string;
+  refreshToken?: string;
+};
+
 export type CircleEnvironmentHealth = {
   ok: boolean;
   missing?: Array<{ id: string; envVar?: string; scope: CircleConfigScope }>;
@@ -91,6 +104,19 @@ export interface CircleBackendAdapter {
     accountType?: CircleAccountType;
   }): Promise<CircleChallengeResponse>;
 
+  /** Adds a wallet on another chain for a user who already has one. */
+  createWallet?(input: {
+    userToken: string;
+    blockchain: string;
+    accountType?: CircleAccountType;
+  }): Promise<CircleChallengeResponse>;
+
+  refreshUserToken?(input: {
+    userToken: string;
+    refreshToken: string;
+    deviceId: string;
+  }): Promise<CircleRefreshTokenResult>;
+
   listWallets(input: { userToken: string }): Promise<CircleWallet[]>;
 
   signMessage(input: {
@@ -118,6 +144,41 @@ export interface CircleBackendAdapter {
   health?(): Promise<CircleHealthReport>;
 }
 
+/** Passed to the Circle Web SDK's hosted screens. */
+export type CircleAppearance = {
+  themeColor?: ThemeColor;
+  localizations?: Localizations;
+  resources?: Resources;
+  customLinks?: CustomLinks;
+};
+
+export type CircleStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
+
+/**
+ * `session` (default) ends with the tab. `local` survives restarts but keeps
+ * the bearer token around longer.
+ */
+export type CircleStorageOption = 'session' | 'local' | CircleStorage;
+
+export type CircleLoginEvent = {
+  environment: CircleEnvironment;
+  method: 'google' | 'email';
+  email?: string;
+};
+
+export type CircleWalletEvent = {
+  environment: CircleEnvironment;
+  wallet: CircleWallet;
+  created: boolean;
+};
+
+export type CircleEvents = {
+  onLogin?: (event: CircleLoginEvent) => void;
+  onWallet?: (event: CircleWalletEvent) => void;
+  onSignOut?: (event: { environment: CircleEnvironment }) => void;
+  onError?: (error: Error, event: { environment: CircleEnvironment }) => void;
+};
+
 export type CircleGoogleOptions = {
   /** Google OAuth Web client id. Public; the secret goes in Circle Console. */
   clientId?: string;
@@ -143,7 +204,8 @@ export type CircleEnvironmentOptions = {
   adapter?: CircleBackendAdapter;
 };
 
-export type CircleOptions = CircleEnvironmentOptions & {
+export type CircleOptions = CircleEnvironmentOptions &
+  CircleEvents & {
   /** `false` disables Circle while keeping the configuration in place. */
   enabled?: boolean;
 
@@ -167,6 +229,11 @@ export type CircleOptions = CircleEnvironmentOptions & {
 
   /** Circle ignores explicit gas and prices by fee level. Defaults to `MEDIUM`. */
   feeLevel?: CircleFeeLevel;
+
+  /** Where the Circle session is kept. Defaults to `session`. */
+  storage?: CircleStorageOption;
+
+  appearance?: CircleAppearance;
 };
 
 export const isCircleEnabled = (circle: CircleOptions | undefined): boolean =>

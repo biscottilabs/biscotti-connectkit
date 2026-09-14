@@ -7,141 +7,220 @@ browser extension, backed by
 The result is a normal wagmi connector: `useAccount()`, `useSignMessage()`,
 `useSendTransaction()` and SIWE all work without special-casing.
 
-- **Opt-in.** Omit the `circle` option and nothing changes — no UI, no bundle cost.
-- **Two authentication methods.** Google social login and email OTP share the
-  same wallet connector after authentication. PIN remains optional and marked
+- **Opt-in.** Omit the `circle` option and nothing changes: no UI, no bundle cost.
+- **Testnet and mainnet.** Configure both and switch with one value.
+- **Two authentication methods.** Google and email OTP. PIN is shown as
   *coming soon* when included in `methods`.
 - **A backend is required.** Circle's API key must never reach the browser.
+  ConnectKit ships the handler.
 
 ---
 
-## 1. Credentials
+## 1. Environments
 
-Three values, and it matters which side each one lives on.
+Circle runs two separate environments. The API key decides which one a request
+reaches, and users, tokens and wallets never cross between them.
+
+| Environment | API key prefix | Chains |
+| --- | --- | --- |
+| `testnet` | `TEST_API_KEY:` | `ETH-SEPOLIA`, `BASE-SEPOLIA`, `ARB-SEPOLIA`, `OP-SEPOLIA`, `MATIC-AMOY`, `AVAX-FUJI`, `UNI-SEPOLIA`, `MONAD-TESTNET`, `ARC-TESTNET` |
+| `mainnet` | `LIVE_API_KEY:` | `ETH`, `BASE`, `ARB`, `OP`, `MATIC`, `AVAX`, `UNI`, `MONAD` |
+
+In Circle Console, switch to each environment to get its App ID and API key,
+and to enable Google and Email authentication there.
+
+## 2. Credentials
 
 | Value | Where to get it | Where it goes |
 | --- | --- | --- |
-| Circle **App ID** | [Circle Console](https://console.circle.com/) → your app | client (`NEXT_PUBLIC_…`) |
-| Google **client ID** | Google Cloud → Credentials → OAuth 2.0 Client ID, type *Web application* | client (`NEXT_PUBLIC_…`) |
-| Circle **API key** | Circle Console → API Keys (use a **sandbox** key in development) | **server only** |
+| Circle **App ID** (per environment) | Circle Console → Wallets → User Controlled → Configurator | client |
+| Google **client ID** | Google Cloud → Credentials → OAuth 2.0 Client ID, type *Web application* | client |
+| Circle **API key** (per environment) | Circle Console → API Keys | **server only** |
 
 Google setup:
 
-- Enable Google under Circle Console → Wallets → User Controlled → Configurator
-  → Authentication Methods → Social Logins, and enter the Web client ID.
+- Enable Google under Authentication Methods → Social Logins in Circle Console
+  and enter the Web client ID.
 - In Google Cloud, add your origin (e.g. `http://localhost:3000`) to the OAuth
-  client's **Authorized redirect URIs**, or Google rejects the sign-in.
+  client's **Authorized redirect URIs**.
 
-Email OTP setup:
+Email setup:
 
-- Enable Email under Circle Console → Authentication Methods → Email.
-- Configure an SMTP provider there. For sandbox testing Circle documents
-  Mailtrap; use your transactional email provider in production.
-
-Circle enforces environment/chain matching: sandbox API keys only work against
-**testnets**, and live API keys only work against **mainnets**. For example,
-pair a sandbox key with `arcTestnet` (`ARC-TESTNET`) or a live key with `base`
-(`BASE`).
-
-When changing environments, discard the previous Circle session and
-reauthenticate. ConnectKit does this automatically when the configured chain no
-longer matches the stored session, preventing a Base wallet from being
-presented as connected in an Arc Testnet app (and vice versa).
+- Enable Email under Authentication Methods → Email and configure SMTP.
+  Mailtrap works for testnet.
 
 ```bash
 # .env.local
-NEXT_PUBLIC_CIRCLE_APP_ID=...
+NEXT_PUBLIC_CIRCLE_ENVIRONMENT=testnet          # or mainnet
+NEXT_PUBLIC_CIRCLE_TESTNET_APP_ID=...
+NEXT_PUBLIC_CIRCLE_MAINNET_APP_ID=...
 NEXT_PUBLIC_GOOGLE_CLIENT_ID=...
-CIRCLE_API_KEY=...          # no NEXT_PUBLIC_ prefix — this grants full account access
+CIRCLE_TESTNET_API_KEY=TEST_API_KEY:...          # no NEXT_PUBLIC_ prefix
+CIRCLE_MAINNET_API_KEY=LIVE_API_KEY:...
 ```
 
-## 2. Install
+You only need the values for the environment a deployment runs.
+
+## 3. Install
 
 ```bash
 npm install @circle-fin/w3s-pw-web-sdk
 ```
 
-It is an optional peer dependency, loaded on demand. Apps that never enable
-Circle never download it.
+It is an optional peer dependency, loaded on demand.
 
-## 3. Configure
-
-Declare it once, where you build your wagmi config:
+## 4. Configure
 
 ```ts
-import { getDefaultConfig } from '@biscottidex/connectkit';
-import { baseSepolia } from 'wagmi/chains';
+import { getDefaultConfig, type CircleEnvironment } from '@biscottidex/connectkit';
+import { arcTestnet, base } from 'wagmi/chains';
 
 export const config = createConfig(
   getDefaultConfig({
     appName: 'My App',
-    chains: [baseSepolia],
+    chains: [base, arcTestnet],
     walletConnectProjectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID!,
     circle: {
-      appId: process.env.NEXT_PUBLIC_CIRCLE_APP_ID,
+      environment: process.env.NEXT_PUBLIC_CIRCLE_ENVIRONMENT as CircleEnvironment,
       google: { clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID },
-      methods: ['google', 'email'],
-      defaultChainId: baseSepolia.id,
+      environments: {
+        testnet: {
+          appId: process.env.NEXT_PUBLIC_CIRCLE_TESTNET_APP_ID,
+          defaultChainId: arcTestnet.id,
+        },
+        mainnet: {
+          appId: process.env.NEXT_PUBLIC_CIRCLE_MAINNET_APP_ID,
+          defaultChainId: base.id,
+          accountType: 'SCA',
+        },
+      },
     },
   })
 );
 ```
 
-The connector carries these options, so `<ConnectKitProvider>` picks them up
-automatically. If you build your wagmi config by hand, pass the same object as
-`<ConnectKitProvider options={{ circle }}>` instead — that form takes precedence.
+The connector carries these options, so `<ConnectKitProvider>` picks them up. If
+you build the wagmi config by hand, pass the same object as
+`<ConnectKitProvider options={{ circle }}>` instead.
+
+Top-level values are shared by both environments; values under `environments`
+override them. A single-environment app can skip `environments` and set
+`appId` directly.
+
+### How the environment is chosen
+
+1. `circle.environment`, if set.
+2. The only entry in `circle.environments`, if there is exactly one.
+3. The environment of `defaultChainId`, then of the first mapped app chain.
+4. `testnet`.
+
+If `environments` declares both, `environment` is required.
 
 ### Options
 
-| Option | Default | Notes |
-| --- | --- | --- |
-| `enabled` | `true` | Set `false` to disable while keeping config in place. |
-| `appId` | — | Circle App ID. |
-| `google.clientId` | — | Google OAuth client ID. |
-| `google.redirectUri` | `window.location.origin` | Must be registered in Google Cloud. |
-| `methods` | `['google', 'email']` | Authentication choices shown in the first Circle screen. |
-| `defaultChainId` | app's first chain | Chain to provision the wallet on. |
-| `feeLevel` | `MEDIUM` | `LOW` / `MEDIUM` / `HIGH`. Circle prices gas itself. |
-| `endpoints.basePath` | `/api/circle` | Where your backend routes live. |
-| `adapter` | — | Replace the HTTP client entirely. |
-| `chains` | — | Add or override Circle chain identifiers. |
-| `name` | `Sign in with Circle` | Label in the wallet list. |
+| Option | Per environment | Default | Notes |
+| --- | --- | --- | --- |
+| `enabled` | | `true` | `false` disables Circle but keeps the config. |
+| `environment` | | inferred | `testnet` or `mainnet`. |
+| `environments` | | | `{ testnet, mainnet }` overrides. |
+| `appId` | yes | | Circle App ID. |
+| `google` | yes | | `clientId`, `redirectUri` (defaults to `window.location.origin`), `selectAccountPrompt`. |
+| `defaultChainId` | yes | first app chain in the environment | Must be in your wagmi `chains`. |
+| `accountType` | yes | `EOA` | `SCA` for Gas Station sponsorship. Avoid on Ethereum mainnet. |
+| `endpoints.basePath` | yes | `/api/circle` | Where the backend handler is mounted. |
+| `adapter` | yes | | Replace the HTTP client. |
+| `methods` | | `['google', 'email']` | |
+| `feeLevel` | | `MEDIUM` | Circle ignores explicit gas. |
+| `chains` | | | Add or override Circle chain identifiers. |
+| `name` | | `Sign in with Circle` | Wallet list label. |
 
-## 4. Backend routes
+## 5. Backend
 
-ConnectKit calls **your** server, which holds the API key and forwards to Circle.
-A complete reference implementation lives in
-[`examples/nextjs-app/app/api/circle`](../examples/nextjs-app/app/api/circle) —
-copy it, or point `endpoints.basePath` at your own.
+Mount the handler from `@biscottidex/connectkit/server`. It reads the API keys,
+picks the key from the `X-Circle-Environment` header ConnectKit sends, and
+forwards to Circle.
+
+**Next.js (App Router):** `app/api/circle/[...route]/route.ts`
+
+```ts
+import { createCircleHandler, readCircleServerEnv } from '@biscottidex/connectkit/server';
+
+const handler = createCircleHandler(readCircleServerEnv());
+
+export const dynamic = 'force-dynamic';
+export { handler as GET, handler as POST };
+```
+
+**Bun, Deno, Workers, Hono:** the handler takes a `Request` and returns a
+`Response`, so pass requests under `/api/circle/*` to it directly.
+
+**Express or Vite dev server:**
+
+```ts
+import {
+  createCircleHandler,
+  createCircleNodeMiddleware,
+  readCircleServerEnv,
+} from '@biscottidex/connectkit/server';
+
+app.use(createCircleNodeMiddleware(createCircleHandler(readCircleServerEnv())));
+```
+
+`readCircleServerEnv` reads `CIRCLE_TESTNET_API_KEY` and `CIRCLE_MAINNET_API_KEY`.
+A single legacy `CIRCLE_API_KEY` is assigned to the environment its prefix names.
+You can also pass keys yourself:
+
+```ts
+createCircleHandler({
+  environments: {
+    testnet: { apiKey: secrets.circleTestnet },
+    mainnet: { apiKey: secrets.circleMainnet },
+  },
+  authorize: async ({ request, route, userToken }) => {
+    // Throw new CircleHttpError(401, '...') to reject.
+  },
+});
+```
+
+The handler:
+
+- serves only environments that have a key, so a deployment without a live key
+  cannot be used against mainnet;
+- refuses a key whose prefix does not match its environment;
+- rejects a blockchain from the other environment before calling Circle;
+- passes Circle's error `code` and a `requestId` back to the client.
 
 | Route | Circle endpoint |
 | --- | --- |
-| `POST /api/circle/device-token` | `POST /users/social/token` |
-| `POST /api/circle/email-otp` | `POST /users/email/token` |
-| `POST /api/circle/initialize-user` | `POST /user/initialize` |
-| `POST /api/circle/wallets` | `GET /wallets` |
-| `POST /api/circle/sign-message` | `POST /user/sign/message` |
-| `POST /api/circle/sign-typed-data` | `POST /user/sign/typedData` |
-| `POST /api/circle/transaction` | `POST /user/transactions/contractExecution` |
-| `GET /api/circle/health` | *(optional)* reports missing server config |
+| `POST /device-token` | `POST /users/social/token` |
+| `POST /email-otp` | `POST /users/email/token` |
+| `POST /initialize-user` | `POST /user/initialize` |
+| `POST /wallets` | `GET /wallets` |
+| `POST /sign-message` | `POST /user/sign/message` |
+| `POST /sign-typed-data` | `POST /user/sign/typedData` |
+| `POST /transaction` | `POST /user/transactions/contractExecution` |
+| `GET /health` | reports configuration per environment |
 
-> **Production note.** These routes trust the `userToken` the browser sends. In a
-> real application, also tie each request to your own session and verify the
-> caller is entitled to act as that Circle user.
+> **Production note.** The browser sends the `userToken`. Use `authorize` to tie
+> each request to your own session.
 
-## 5. Diagnosing setup problems
+If the backend is on another origin, allow the `X-Circle-Environment` header in
+your CORS configuration.
 
-Missing configuration never hides the button. Clicking it runs a preflight check
-and the screen branches on environment:
+## 6. Diagnosing setup problems
 
-- **Development** (or `<ConnectKitProvider debugMode>`) — every missing value is
-  listed by name, tagged with whether it belongs in client env, server env, or a
+Clicking the Circle button runs a preflight check:
+
+- **Development** (or `<ConnectKitProvider debugMode>`): every problem is listed
+  with the variable name and whether it belongs in client env, server env, or a
   console.
-- **Production** — a generic "temporarily unavailable" message. Environment
-  variable names are never shown to end users.
+- **Production:** a generic "temporarily unavailable" message.
 
-`GET /api/circle/health` reports which server-side values are absent. It returns
-only *presence*, never values, so it is safe to leave enabled.
+Preflight catches a missing App ID or Google client ID, an invalid or ambiguous
+environment, a default chain from the other environment, and a default chain
+missing from your wagmi `chains`. `GET /api/circle/health` adds missing or
+mismatched server keys for the active environment. It reports presence only,
+never values.
 
 ## How it works
 
@@ -160,44 +239,37 @@ Choose Email  -> /email-otp   -> verifyOtp() -> hosted OTP window
 ```
 
 Signing follows the same shape: the backend returns a `challengeId`, the SDK
-opens Circle's hosted confirmation UI, and the signature comes back on the
-challenge result — no polling.
+opens Circle's confirmation UI, and the signature comes back on the challenge
+result.
+
+Sessions are stored in `sessionStorage` per environment and App ID. Changing
+environment shows that environment's session (or none) without deleting the
+other one.
 
 ## Limitations
 
-These are properties of Circle's model, not gaps in the integration:
+These come from Circle's model:
 
-- **No `eth_sign`** — legacy blind signing has no Circle equivalent.
-- **No `eth_signTransaction`** — Circle broadcasts as part of the challenge and
-  never returns a signed-but-unsent transaction.
-- **No contract deployment** — transactions require a `to` address.
-- **Explicit gas is ignored** — set `feeLevel` instead.
-- **One wallet per chain** — switching chains selects a different Circle wallet,
-  and fails if the user has none on the target chain.
-- **14-day sessions** — this integration retains Circle's refresh token but does
-  not refresh automatically yet, so users authenticate again after expiry.
+- **No `eth_sign`** and **no `eth_signTransaction`**.
+- **No contract deployment**: transactions need a `to` address.
+- **Explicit gas is ignored**: set `feeLevel`.
+- **One wallet per chain**: switching chains selects another Circle wallet and
+  fails if the user has none there. Switching to a chain in the other
+  environment always fails; that is a different Circle user.
+- **14-day sessions**: the refresh token is stored but not used yet.
+- **Generic `EVM` / `EVM-TESTNET` chains** support signing only; Circle does not
+  broadcast on them.
 
-Supported EVM chains are listed in
-[`src/circle/chains.ts`](../packages/connectkit/src/circle/chains.ts). Circle's
-`ARC-TESTNET` is mapped to viem's Arc Testnet chain ID (`5042002`). Circle's
-generic `EVM` buckets remain deliberately absent rather than guessed; add them
-with the `chains` option once you have confirmed the target chain IDs.
+Chain mappings live in
+[`src/circle/chains.ts`](../packages/connectkit/src/circle/chains.ts).
 
 ## Headless usage
-
-For a custom UI, skip the modal entirely:
 
 ```tsx
 import { useCircleLogin } from '@biscottidex/connectkit';
 
-const {
-  status,
-  issues,
-  signInWithGoogle,
-  signInWithEmail,
-  signOut,
-  address,
-} = useCircleLogin();
+const { status, environment, issues, signInWithGoogle, signInWithEmail, signOut, address } =
+  useCircleLogin();
 
 await signInWithEmail('user@example.com');
 ```

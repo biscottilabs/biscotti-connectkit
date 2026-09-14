@@ -9,6 +9,8 @@ import type {
   EmailLoginResult,
 } from '@circle-fin/w3s-pw-web-sdk/dist/src/types';
 
+import type { ResolvedCircleConfig } from './config';
+
 export type CircleSdk = W3SSdk;
 export type CircleChallengeResult =
   | ChallengeResult
@@ -107,6 +109,22 @@ export const getCircleSdk = async (
   }
 
   return instance;
+};
+
+/** Also applies `circle.appearance` to Circle's hosted screens. */
+export const getCircleSdkFor = async (
+  circle: ResolvedCircleConfig,
+  configs?: Configs,
+  onLoginComplete?: LoginCompleteCallback
+): Promise<W3SSdk> => {
+  const sdk = await getCircleSdk(circle.appId ?? '', configs, onLoginComplete);
+  const { themeColor, localizations, resources, customLinks } =
+    circle.appearance ?? {};
+  if (themeColor) sdk.setThemeColor(themeColor);
+  if (localizations) sdk.setLocalizations(localizations);
+  if (resources) sdk.setResources(resources);
+  if (customLinks) sdk.setCustomLinks(customLinks);
+  return sdk;
 };
 
 /** Test seam and hard-reset for logout. */

@@ -3,12 +3,18 @@ import type {
   EmailLoginResult,
 } from '@circle-fin/w3s-pw-web-sdk/dist/src/types';
 
-import type { CircleBackendAdapter, CircleWallet } from './types';
+import type {
+  CircleBackendAdapter,
+  CircleChallengeResponse,
+  CircleWallet,
+} from './types';
+import { CircleBackendError } from './backend';
 import { environmentOfBlockchain, toCircleBlockchain } from './chains';
-import type { ResolvedCircleConfig } from './config';
-import { getCircleSdk, loadCircleSdk, executeChallenge } from './sdk';
+import { emitCircleEvent, type ResolvedCircleConfig } from './config';
+import { getCircleSdkFor, loadCircleSdk, executeChallenge } from './sdk';
 import {
   clearPendingLogin,
+  clearSession,
   readPendingLogin,
   savePendingLogin,
   saveSession,
@@ -28,6 +34,7 @@ export const sessionScope = (
 ): CircleSessionScope => ({
   environment: circle.environment,
   appId: circle.appId,
+  storage: circle.storage,
 });
 
 const resolveRedirectUri = (circle: ResolvedCircleConfig): string =>
@@ -88,7 +95,7 @@ export const beginGoogleLogin = async ({
   chainId,
 }: CircleLoginContext): Promise<void> => {
   const { SocialLoginProvider } = await loadCircleSdk();
-  const sdk = await getCircleSdk(circle.appId ?? '');
+  const sdk = await getCircleSdkFor(circle);
 
   const deviceId = await sdk.getDeviceId();
   const { deviceToken, deviceEncryptionKey } = await adapter.createDeviceToken({
@@ -125,7 +132,7 @@ export const beginEmailLogin = async ({
     );
   }
 
-  const sdk = await getCircleSdk(circle.appId ?? '');
+  const sdk = await getCircleSdkFor(circle);
   const deviceId = await sdk.getDeviceId();
   const { deviceToken, deviceEncryptionKey, otpToken } =
     await adapter.requestEmailOtp({ deviceId, email });
@@ -169,12 +176,19 @@ export const beginEmailLogin = async ({
       });
     };
 
-    getCircleSdk(circle.appId ?? '', configs, onLoginComplete)
+    getCircleSdkFor(circle, configs, onLoginComplete)
       .then((configuredSdk) => configuredSdk.verifyOtp())
       .catch(reject);
   });
 
   saveSession(sessionScope(circle), session);
+  emitCircleEvent(() =>
+    circle.events.onLogin?.({
+      environment: circle.environment,
+      method: 'email',
+      email,
+    })
+  );
   return session;
 };
 
@@ -250,7 +264,7 @@ export const resumeGoogleLogin = async (
       );
     }, LOGIN_CALLBACK_TIMEOUT_MS);
 
-    getCircleSdk(circle.appId ?? '', configs, (error, loginResult) => {
+    getCircleSdkFor(circle, configs, (error, loginResult) => {
       clearTimeout(timer);
       clearPendingLogin(scope);
       clearOAuthReturnFromAddressBar();
@@ -289,15 +303,90 @@ export const resumeGoogleLogin = async (
   });
 
   saveSession(scope, result);
+  emitCircleEvent(() =>
+    circle.events.onLogin?.({
+      environment: circle.environment,
+      method: 'google',
+      email: result.email,
+    })
+  );
   return result;
 };
 
+// Refresh at most daily; tokens last 14 days.
+const REFRESH_AFTER_MS = 24 * 60 * 60 * 1000;
+
+const refreshing = new Map<string, Promise<CircleSession | null>>();
+
 /**
- * Returns the user's wallet on the requested chain, provisioning one if this is
- * their first visit.
- *
- * `initializeUser` only hands back a challenge, and the wallet does not exist
- * until the authenticated user approves it in Circle's hosted UI.
+ * Renews the user token once it is a day old, so an active user is never
+ * logged out at the 14-day mark. Returns `null` when Circle rejects the token,
+ * after clearing the session. Other failures keep the current session.
+ */
+export const refreshSessionIfStale = ({
+  circle,
+  adapter,
+  session,
+}: {
+  circle: ResolvedCircleConfig;
+  adapter: CircleBackendAdapter;
+  session: CircleSession;
+}): Promise<CircleSession | null> => {
+  if (
+    !session.refreshToken ||
+    !adapter.refreshUserToken ||
+    Date.now() - session.createdAt < REFRESH_AFTER_MS
+  ) {
+    return Promise.resolve(session);
+  }
+
+  const key = `${circle.environment}:${circle.appId ?? ''}`;
+  const inFlight = refreshing.get(key);
+  if (inFlight) return inFlight;
+
+  const scope = sessionScope(circle);
+  const run = (async () => {
+    try {
+      const sdk = await getCircleSdkFor(circle);
+      const result = await adapter.refreshUserToken!({
+        userToken: session.userToken,
+        refreshToken: session.refreshToken!,
+        deviceId: await sdk.getDeviceId(),
+      });
+      const next: CircleSession = {
+        ...session,
+        userToken: result.userToken,
+        encryptionKey: result.encryptionKey ?? session.encryptionKey,
+        refreshToken: result.refreshToken ?? session.refreshToken,
+        createdAt: Date.now(),
+      };
+      saveSession(scope, next);
+      return next;
+    } catch (error) {
+      if (
+        error instanceof CircleBackendError &&
+        (error.status === 401 || String(error.code) === '155104')
+      ) {
+        clearSession(scope);
+        return null;
+      }
+      return session;
+    } finally {
+      refreshing.delete(key);
+    }
+  })();
+
+  refreshing.set(key, run);
+  return run;
+};
+
+// Circle: "User already initialized".
+const isAlreadyInitialized = (error: unknown) =>
+  error instanceof CircleBackendError && String(error.code) === '155106';
+
+/**
+ * Returns the user's wallet on the chain, creating one if needed. Creation is a
+ * challenge the user approves in Circle's hosted UI.
  */
 export const ensureWallet = async ({
   circle,
@@ -323,26 +412,51 @@ export const ensureWallet = async ({
 
   const scope = sessionScope(circle);
   const { userToken, encryptionKey } = session;
-  const sdk = await getCircleSdk(circle.appId ?? '');
+  const sdk = await getCircleSdkFor(circle);
   sdk.setAuthentication({ userToken, encryptionKey });
 
-  const existing = (await adapter.listWallets({ userToken })).find(
-    (wallet) => wallet.blockchain === blockchain
-  );
+  const wallets = await adapter.listWallets({ userToken });
+  const existing = wallets.find((wallet) => wallet.blockchain === blockchain);
   if (existing) {
     updateSession(scope, {
       walletId: existing.id,
       address: existing.address,
       chainId,
     });
+    emitCircleEvent(() =>
+      circle.events.onWallet?.({
+        environment: circle.environment,
+        wallet: existing,
+        created: false,
+      })
+    );
     return existing;
   }
 
-  const { challengeId } = await adapter.initializeUser({
-    userToken,
-    blockchain,
-    accountType: circle.accountType,
-  });
+  const input = { userToken, blockchain, accountType: circle.accountType };
+
+  // `initializeUser` works only once per user; later wallets use `createWallet`.
+  const createForExistingUser = (): Promise<CircleChallengeResponse> => {
+    if (!adapter.createWallet) {
+      throw new Error(
+        `This user already has a Circle wallet. Add \`createWallet\` to your Circle backend adapter to create one on ${blockchain}.`
+      );
+    }
+    return adapter.createWallet(input);
+  };
+
+  let challenge: CircleChallengeResponse;
+  if (wallets.length > 0) {
+    challenge = await createForExistingUser();
+  } else {
+    try {
+      challenge = await adapter.initializeUser(input);
+    } catch (error) {
+      if (!isAlreadyInitialized(error)) throw error;
+      challenge = await createForExistingUser();
+    }
+  }
+  const { challengeId } = challenge;
 
   await executeChallenge(sdk, challengeId);
 
@@ -361,5 +475,12 @@ export const ensureWallet = async ({
     address: created.address,
     chainId,
   });
+  emitCircleEvent(() =>
+    circle.events.onWallet?.({
+      environment: circle.environment,
+      wallet: created,
+      created: true,
+    })
+  );
   return created;
 };

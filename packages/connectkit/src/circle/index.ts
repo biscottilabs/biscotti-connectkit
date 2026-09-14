@@ -5,6 +5,13 @@ export type {
   CircleAccountType,
   CircleFeeLevel,
   CircleEnvironmentHealth,
+  CircleAppearance,
+  CircleStorage,
+  CircleStorageOption,
+  CircleEvents,
+  CircleLoginEvent,
+  CircleWalletEvent,
+  CircleRefreshTokenResult,
   CircleLoginMethod,
   CircleConfigScope,
   CircleConfigIssue,
@@ -71,6 +78,7 @@ export {
   resumeGoogleLogin,
   ensureWallet,
   looksLikeOAuthReturn,
+  refreshSessionIfStale,
 } from './login';
 
 export {

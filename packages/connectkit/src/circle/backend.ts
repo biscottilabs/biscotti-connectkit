@@ -7,6 +7,7 @@ import type {
   CircleEmailOtpResult,
   CircleEndpointConfig,
   CircleHealthReport,
+  CircleRefreshTokenResult,
   CircleWallet,
 } from './types';
 
@@ -125,6 +126,12 @@ export const createHttpBackendAdapter = (
 
     initializeUser: (input) =>
       request<CircleChallengeResponse>('/initialize-user', input),
+
+    createWallet: (input) =>
+      request<CircleChallengeResponse>('/create-wallet', input),
+
+    refreshUserToken: (input) =>
+      request<CircleRefreshTokenResult>('/refresh-token', input),
 
     listWallets: async (input) => {
       const result = await request<{ wallets: CircleWallet[] }>(
