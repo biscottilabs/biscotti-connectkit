@@ -1,39 +1,34 @@
+import { CIRCLE_ENVIRONMENTS, type CircleEnvironment } from './chains';
+import type { CircleStorage, CircleStorageOption } from './types';
+
 /**
- * Session persistence for the Circle integration.
- *
- * Two distinct records live here:
- *
- *  - `pending`: written immediately *before* the Google OAuth redirect. Google
- *    navigates the whole page away, so every scrap of in-memory state is lost.
- *    Without this the SDK cannot process the OAuth response when the user
- *    returns, because the device token it was configured with is gone.
- *  - `session`: the authenticated result, kept so a page refresh does not force
- *    the user back through Google while their token is still valid.
- *
- * Storage is `sessionStorage`, not `localStorage`: the user token is a bearer
- * credential and should not outlive the browser tab. Note that any storage
- * readable by JavaScript is readable by injected script, so a site with an XSS
- * hole leaks this token — Circle's token expiry is what bounds the damage.
+ * Records are keyed by environment: a testnet token is useless to a mainnet
+ * key, but switching back should not lose it. Each also stores its App ID and
+ * is dropped if that changes.
  */
 
 const SESSION_KEY = 'ck-circle-session';
 const PENDING_KEY = 'ck-circle-pending';
 
-/**
- * Circle social/email user tokens expire after 14 days. Expire five minutes
- * early to avoid handing a token to a challenge at the end of its lifetime.
- * The refresh token is retained in the session so applications can add Circle's
- * refresh endpoint without changing the stored shape.
- */
+// Circle user tokens last 14 days; expire five minutes early.
 const TOKEN_TTL_MS = 14 * 24 * 60 * 60 * 1000 - 5 * 60 * 1000;
 
-/** OAuth round trips are fast; anything older is a stale tab, not a redirect. */
 const PENDING_TTL_MS = 10 * 60 * 1000;
 
+export type CircleSessionScope = {
+  environment: CircleEnvironment;
+  appId?: string;
+  storage?: CircleStorageOption;
+};
+
+/** Saved before the Google redirect, which discards all in-memory state. */
 export type CirclePendingLogin = {
+  /** Absent in records written before Facebook support. */
+  provider?: 'google' | 'facebook';
   deviceToken: string;
   deviceEncryptionKey: string;
   chainId: number;
+  appId?: string;
   createdAt: number;
 };
 
@@ -45,21 +40,23 @@ export type CircleSession = {
   walletId?: string;
   address?: string;
   chainId?: number;
+  environment?: CircleEnvironment;
+  appId?: string;
   createdAt: number;
 };
 
-const storage = (): Storage | null => {
+const resolveStorage = (option?: CircleStorageOption): CircleStorage | null => {
+  if (option && typeof option === 'object') return option;
   if (typeof window === 'undefined') return null;
   try {
-    return window.sessionStorage;
+    return option === 'local' ? window.localStorage : window.sessionStorage;
   } catch {
-    // Private browsing modes and sandboxed iframes can throw on access.
     return null;
   }
 };
 
-const read = <T>(key: string): T | null => {
-  const store = storage();
+const read = <T>(option: CircleStorageOption | undefined, key: string): T | null => {
+  const store = resolveStorage(option);
   if (!store) return null;
   try {
     const raw = store.getItem(key);
@@ -69,60 +66,97 @@ const read = <T>(key: string): T | null => {
   }
 };
 
-const write = (key: string, value: unknown) => {
-  const store = storage();
+const write = (
+  option: CircleStorageOption | undefined,
+  key: string,
+  value: unknown
+) => {
+  const store = resolveStorage(option);
   if (!store) return;
   try {
     store.setItem(key, JSON.stringify(value));
   } catch {
-    /* quota or disabled storage — the flow still works, just without resume */
+    /* storage full or disabled */
   }
 };
 
-const remove = (key: string) => {
-  const store = storage();
+const remove = (option: CircleStorageOption | undefined, key: string) => {
+  const store = resolveStorage(option);
   if (!store) return;
   try {
     store.removeItem(key);
   } catch {
-    /* nothing useful to do */
+    /* storage disabled */
   }
 };
 
-export const savePendingLogin = (
-  pending: Omit<CirclePendingLogin, 'createdAt'>
-) => write(PENDING_KEY, { ...pending, createdAt: Date.now() });
+const keyFor = (base: string, environment: CircleEnvironment) =>
+  `${base}:${environment}`;
 
-export const readPendingLogin = (): CirclePendingLogin | null => {
-  const pending = read<CirclePendingLogin>(PENDING_KEY);
+const belongsToApp = (record: { appId?: string }, appId?: string) =>
+  !appId || !record.appId || record.appId === appId;
+
+export const savePendingLogin = (
+  scope: CircleSessionScope,
+  pending: Omit<CirclePendingLogin, 'createdAt' | 'appId'>
+) =>
+  write(scope.storage, keyFor(PENDING_KEY, scope.environment), {
+    ...pending,
+    appId: scope.appId,
+    createdAt: Date.now(),
+  });
+
+export const readPendingLogin = (
+  scope: CircleSessionScope
+): CirclePendingLogin | null => {
+  const key = keyFor(PENDING_KEY, scope.environment);
+  const pending = read<CirclePendingLogin>(scope.storage, key);
   if (!pending) return null;
 
-  if (Date.now() - pending.createdAt > PENDING_TTL_MS) {
-    remove(PENDING_KEY);
+  if (
+    Date.now() - pending.createdAt > PENDING_TTL_MS ||
+    !belongsToApp(pending, scope.appId)
+  ) {
+    remove(scope.storage, key);
     return null;
   }
 
   return pending;
 };
 
-export const clearPendingLogin = () => remove(PENDING_KEY);
+export const clearPendingLogin = (scope: CircleSessionScope) =>
+  remove(scope.storage, keyFor(PENDING_KEY, scope.environment));
 
-export const saveSession = (session: Omit<CircleSession, 'createdAt'>) =>
-  write(SESSION_KEY, { ...session, createdAt: Date.now() });
+export const saveSession = (
+  scope: CircleSessionScope,
+  session: Omit<CircleSession, 'createdAt' | 'environment' | 'appId'>
+) =>
+  write(scope.storage, keyFor(SESSION_KEY, scope.environment), {
+    ...session,
+    environment: scope.environment,
+    appId: scope.appId,
+    createdAt: Date.now(),
+  });
 
-/** Merges into the existing session, e.g. to attach a wallet after login. */
-export const updateSession = (patch: Partial<CircleSession>) => {
-  const current = read<CircleSession>(SESSION_KEY);
+export const updateSession = (
+  scope: CircleSessionScope,
+  patch: Partial<Omit<CircleSession, 'environment' | 'appId'>>
+) => {
+  const key = keyFor(SESSION_KEY, scope.environment);
+  const current = read<CircleSession>(scope.storage, key);
   if (!current) return;
-  write(SESSION_KEY, { ...current, ...patch });
+  write(scope.storage, key, { ...current, ...patch });
 };
 
-export const readSession = (): CircleSession | null => {
-  const session = read<CircleSession>(SESSION_KEY);
+export const readSession = (
+  scope: CircleSessionScope
+): CircleSession | null => {
+  const key = keyFor(SESSION_KEY, scope.environment);
+  const session = read<CircleSession>(scope.storage, key);
   if (!session) return null;
 
-  if (isSessionExpired(session)) {
-    remove(SESSION_KEY);
+  if (isSessionExpired(session) || !belongsToApp(session, scope.appId)) {
+    remove(scope.storage, key);
     return null;
   }
 
@@ -132,7 +166,18 @@ export const readSession = (): CircleSession | null => {
 export const isSessionExpired = (session: CircleSession): boolean =>
   Date.now() - session.createdAt > TOKEN_TTL_MS;
 
-export const clearSession = () => {
-  remove(SESSION_KEY);
-  remove(PENDING_KEY);
+/** Without an environment, clears both plus the unscoped legacy keys. */
+export const clearSession = ({
+  environment,
+  storage,
+}: Partial<CircleSessionScope> = {}) => {
+  const environments = environment ? [environment] : CIRCLE_ENVIRONMENTS;
+  for (const env of environments) {
+    remove(storage, keyFor(SESSION_KEY, env));
+    remove(storage, keyFor(PENDING_KEY, env));
+  }
+  if (!environment) {
+    remove(storage, SESSION_KEY);
+    remove(storage, PENDING_KEY);
+  }
 };

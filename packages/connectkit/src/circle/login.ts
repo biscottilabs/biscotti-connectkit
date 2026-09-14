@@ -1,59 +1,239 @@
 import type {
   Configs,
   EmailLoginResult,
+  SocialLoginResult,
 } from '@circle-fin/w3s-pw-web-sdk/dist/src/types';
 
-import type { CircleBackendAdapter, CircleOptions, CircleWallet } from './types';
-import { toCircleBlockchain } from './chains';
-import { getCircleSdk, loadCircleSdk, executeChallenge } from './sdk';
+import type {
+  CircleBackendAdapter,
+  CircleChallengeResponse,
+  CircleDeviceTokenResult,
+  CircleSocialProvider,
+  CircleWallet,
+} from './types';
+import { CircleBackendError } from './backend';
+import { environmentOfBlockchain, toCircleBlockchain } from './chains';
+import { emitCircleEvent, type ResolvedCircleConfig } from './config';
+import { getCircleSdkFor, loadCircleSdk, executeChallenge } from './sdk';
 import {
   clearPendingLogin,
+  clearSession,
   readPendingLogin,
   savePendingLogin,
   saveSession,
   updateSession,
   type CircleSession,
+  type CircleSessionScope,
 } from './session';
 
 export type CircleLoginContext = {
-  circle: CircleOptions;
+  circle: ResolvedCircleConfig;
   adapter: CircleBackendAdapter;
   chainId: number;
 };
 
-const resolveRedirectUri = (circle: CircleOptions): string =>
-  circle.google?.redirectUri ??
-  (typeof window !== 'undefined' ? window.location.origin : '');
-
-/**
- * The SDK must be configured with the *same* device token on both sides of the
- * OAuth redirect, so this is built from stored values on resume rather than
- * from a fresh token.
- */
-const buildConfigs = (
-  circle: CircleOptions,
-  deviceToken: string,
-  deviceEncryptionKey: string
-): Configs => ({
-  appSettings: { appId: circle.appId ?? '' },
-  loginConfigs: {
-    deviceToken,
-    deviceEncryptionKey,
-    google: {
-      clientId: circle.google?.clientId ?? '',
-      redirectUri: resolveRedirectUri(circle),
-      selectAccountPrompt: circle.google?.selectAccountPrompt ?? true,
-    },
-  },
+export const sessionScope = (
+  circle: ResolvedCircleConfig
+): CircleSessionScope => ({
+  environment: circle.environment,
+  appId: circle.appId,
+  storage: circle.storage,
 });
 
+const origin = () =>
+  typeof window !== 'undefined' ? window.location.origin : '';
+
+const PROVIDER_LABEL: Record<CircleSocialProvider, string> = {
+  google: 'Google',
+  facebook: 'Facebook',
+  apple: 'Apple',
+};
+
 /**
- * Circle's current docs require an `email` object inside `loginConfigs`.
- * Version 1.1.11 accepts it at runtime, although its published LoginConfigs
- * declaration does not include the field yet.
+ * The SDK must see the same device token on both sides of a redirect, so on
+ * resume this is built from the stored values rather than a fresh token.
  */
+const socialLoginConfigs = (
+  circle: ResolvedCircleConfig,
+  provider: CircleSocialProvider,
+  { deviceToken, deviceEncryptionKey }: CircleDeviceTokenResult
+): Configs => {
+  const loginConfigs: NonNullable<Configs['loginConfigs']> = {
+    deviceToken,
+    deviceEncryptionKey,
+  };
+
+  if (provider === 'google') {
+    loginConfigs.google = {
+      clientId: circle.google.clientId ?? '',
+      redirectUri: circle.google.redirectUri ?? origin(),
+      selectAccountPrompt: circle.google.selectAccountPrompt ?? true,
+    };
+  } else if (provider === 'facebook') {
+    loginConfigs.facebook = {
+      appId: circle.facebook.appId ?? '',
+      redirectUri: circle.facebook.redirectUri ?? origin(),
+    };
+  } else {
+    loginConfigs.apple = circle.apple;
+  }
+
+  return { appSettings: { appId: circle.appId ?? '' }, loginConfigs };
+};
+
+type LoginError = { code?: number; message: string } | undefined;
+
+/** Turns the SDK's login callback into a session, or a readable error. */
+const settleLogin = (
+  label: string,
+  chainId: number,
+  resolve: (session: CircleSession) => void,
+  reject: (error: Error) => void
+) => (error: LoginError, result: SocialLoginResult | EmailLoginResult | undefined) => {
+  if (error) {
+    reject(
+      new Error(
+        `${label} sign-in failed${
+          error.code !== undefined ? ` (code ${error.code})` : ''
+        }: ${error.message}`
+      )
+    );
+    return;
+  }
+
+  if (!result?.userToken || !result.encryptionKey) {
+    reject(new Error(`${label} sign-in returned an incomplete result.`));
+    return;
+  }
+
+  resolve({
+    userToken: result.userToken,
+    encryptionKey: result.encryptionKey,
+    refreshToken: result.refreshToken,
+    email:
+      'oAuthInfo' in result
+        ? result.oAuthInfo?.socialUserInfo?.email
+        : undefined,
+    chainId,
+    createdAt: Date.now(),
+  });
+};
+
+const requestDeviceToken = async (
+  circle: ResolvedCircleConfig,
+  adapter: CircleBackendAdapter
+): Promise<CircleDeviceTokenResult> => {
+  const sdk = await getCircleSdkFor(circle);
+  return adapter.createDeviceToken({ deviceId: await sdk.getDeviceId() });
+};
+
+/**
+ * Starts Google or Facebook sign-in. The browser navigates away; control
+ * resumes in {@link resumeSocialLogin} after the redirect.
+ */
+export const beginRedirectLogin = async ({
+  circle,
+  adapter,
+  chainId,
+  provider,
+}: CircleLoginContext & { provider: 'google' | 'facebook' }): Promise<void> => {
+  const { SocialLoginProvider } = await loadCircleSdk();
+  const sdk = await getCircleSdkFor(circle);
+  const tokens = await requestDeviceToken(circle, adapter);
+
+  // Saved before navigating: once `performLogin` runs, this page is gone.
+  savePendingLogin(sessionScope(circle), { ...tokens, chainId, provider });
+
+  sdk.updateConfigs(socialLoginConfigs(circle, provider, tokens));
+
+  await sdk.performLogin(
+    (provider === 'google'
+      ? SocialLoginProvider.GOOGLE
+      : SocialLoginProvider.FACEBOOK) as never
+  );
+};
+
+export const beginGoogleLogin = (context: CircleLoginContext) =>
+  beginRedirectLogin({ ...context, provider: 'google' });
+
+export const beginFacebookLogin = (context: CircleLoginContext) =>
+  beginRedirectLogin({ ...context, provider: 'facebook' });
+
+// Apple opens a popup, which browsers block if it follows a slow network call.
+const APPLE_TOKEN_REUSE_MS = 5 * 60 * 1000;
+
+const preparedAppleTokens = new Map<
+  string,
+  { promise: Promise<CircleDeviceTokenResult>; createdAt: number }
+>();
+
+const appleKey = (circle: ResolvedCircleConfig) =>
+  `${circle.environment}:${circle.appId ?? ''}`;
+
+/** Fetches the device token before the user clicks, so the popup opens at once. */
+export const prepareAppleLogin = ({
+  circle,
+  adapter,
+}: Pick<CircleLoginContext, 'circle' | 'adapter'>) => {
+  const key = appleKey(circle);
+  const existing = preparedAppleTokens.get(key);
+  if (existing && Date.now() - existing.createdAt < APPLE_TOKEN_REUSE_MS) return;
+
+  const promise = requestDeviceToken(circle, adapter);
+  promise.catch(() => preparedAppleTokens.delete(key));
+  preparedAppleTokens.set(key, { promise, createdAt: Date.now() });
+};
+
+/**
+ * Signs in with Apple in a popup and returns the session. Resolves only when
+ * Circle reports a result; if the user closes the popup nothing is reported,
+ * so offer a way to cancel.
+ */
+export const beginAppleLogin = async ({
+  circle,
+  adapter,
+  chainId,
+}: CircleLoginContext): Promise<CircleSession> => {
+  if (!circle.apple) {
+    throw new Error(
+      'Apple sign-in needs `circle.apple` set to your Firebase web app config.'
+    );
+  }
+
+  const key = appleKey(circle);
+  const prepared = preparedAppleTokens.get(key);
+  preparedAppleTokens.delete(key);
+
+  const tokens =
+    (prepared && Date.now() - prepared.createdAt < APPLE_TOKEN_REUSE_MS
+      ? await prepared.promise.catch(() => null)
+      : null) ?? (await requestDeviceToken(circle, adapter));
+
+  const { SocialLoginProvider } = await loadCircleSdk();
+
+  const session = await new Promise<CircleSession>((resolve, reject) => {
+    getCircleSdkFor(
+      circle,
+      socialLoginConfigs(circle, 'apple', tokens),
+      settleLogin('Apple', chainId, resolve, reject)
+    )
+      .then((sdk) => sdk.performLogin(SocialLoginProvider.APPLE as never))
+      .catch(reject);
+  });
+
+  saveSession(sessionScope(circle), session);
+  emitCircleEvent(() =>
+    circle.events.onLogin?.({
+      environment: circle.environment,
+      method: 'apple',
+      email: session.email,
+    })
+  );
+  return session;
+};
+
 const buildEmailConfigs = (
-  circle: CircleOptions,
+  circle: ResolvedCircleConfig,
   email: string,
   deviceToken: string,
   deviceEncryptionKey: string,
@@ -68,31 +248,6 @@ const buildEmailConfigs = (
       email: { email },
     },
   } as Configs);
-
-/**
- * Starts Google sign-in. This navigates the browser away and does not return —
- * control resumes in {@link resumeGoogleLogin} after Google redirects back.
- */
-export const beginGoogleLogin = async ({
-  circle,
-  adapter,
-  chainId,
-}: CircleLoginContext): Promise<void> => {
-  const { SocialLoginProvider } = await loadCircleSdk();
-  const sdk = await getCircleSdk();
-
-  const deviceId = await sdk.getDeviceId();
-  const { deviceToken, deviceEncryptionKey } = await adapter.createDeviceToken({
-    deviceId,
-  });
-
-  // Persist before navigating: once `performLogin` fires, this page is gone.
-  savePendingLogin({ deviceToken, deviceEncryptionKey, chainId });
-
-  sdk.updateConfigs(buildConfigs(circle, deviceToken, deviceEncryptionKey));
-
-  await sdk.performLogin(SocialLoginProvider.GOOGLE as never);
-};
 
 /**
  * Sends an email OTP and opens Circle's hosted verification UI.
@@ -112,7 +267,7 @@ export const beginEmailLogin = async ({
     );
   }
 
-  const sdk = await getCircleSdk();
+  const sdk = await getCircleSdkFor(circle);
   const deviceId = await sdk.getDeviceId();
   const { deviceToken, deviceEncryptionKey, otpToken } =
     await adapter.requestEmailOtp({ deviceId, email });
@@ -126,48 +281,28 @@ export const beginEmailLogin = async ({
   );
 
   const session = await new Promise<CircleSession>((resolve, reject) => {
-    const onLoginComplete = (
-      error: { code?: number; message: string } | undefined,
-      result: EmailLoginResult | undefined
-    ) => {
-      if (error) {
-        reject(
-          new Error(
-            `Email verification failed${
-              error.code !== undefined ? ` (code ${error.code})` : ''
-            }: ${error.message}`
-          )
-        );
-        return;
-      }
+    const onLoginComplete = settleLogin('Email', chainId, (value) =>
+      resolve({ ...value, email }), reject);
 
-      if (!result?.userToken || !result.encryptionKey) {
-        reject(new Error('Email verification returned an incomplete result.'));
-        return;
-      }
-
-      resolve({
-        userToken: result.userToken,
-        encryptionKey: result.encryptionKey,
-        refreshToken: result.refreshToken,
-        email,
-        chainId,
-        createdAt: Date.now(),
-      });
-    };
-
-    getCircleSdk(configs, onLoginComplete)
+    getCircleSdkFor(circle, configs, onLoginComplete)
       .then((configuredSdk) => configuredSdk.verifyOtp())
       .catch(reject);
   });
 
-  saveSession(session);
+  saveSession(sessionScope(circle), session);
+  emitCircleEvent(() =>
+    circle.events.onLogin?.({
+      environment: circle.environment,
+      method: 'email',
+      email,
+    })
+  );
   return session;
 };
 
 /**
  * True when the current URL carries an OAuth response. Used to avoid waiting on
- * a login callback that is never going to fire — for instance when a stale
+ * a login callback that is never going to fire, for instance when a stale
  * pending record survives an abandoned sign-in.
  */
 export const looksLikeOAuthReturn = (): boolean => {
@@ -182,8 +317,8 @@ export const looksLikeOAuthReturn = (): boolean => {
  * Requiring both the SDK callback values and our pending record prevents an
  * unrelated OAuth callback elsewhere in the host app from opening ConnectKit.
  */
-export const shouldResumeGoogleLogin = (): boolean =>
-  readPendingLogin() !== null && looksLikeOAuthReturn();
+export const shouldResumeSocialLogin = (circle: ResolvedCircleConfig): boolean =>
+  readPendingLogin(sessionScope(circle)) !== null && looksLikeOAuthReturn();
 
 const clearOAuthReturnFromAddressBar = () => {
   if (typeof window === 'undefined') return;
@@ -209,81 +344,131 @@ const clearOAuthReturnFromAddressBar = () => {
 const LOGIN_CALLBACK_TIMEOUT_MS = 45_000;
 
 /**
- * Completes a login that was started before an OAuth redirect.
- *
- * Returns `null` when there is nothing to resume, so it is safe to call on
- * every mount.
+ * Completes a Google or Facebook login started before the redirect. Returns
+ * `null` when there is nothing to resume, so it is safe to call on every mount.
  */
-export const resumeGoogleLogin = async (
-  circle: CircleOptions
+export const resumeSocialLogin = async (
+  circle: ResolvedCircleConfig
 ): Promise<CircleSession | null> => {
-  const pending = readPendingLogin();
+  const scope = sessionScope(circle);
+  const pending = readPendingLogin(scope);
   if (!pending || !looksLikeOAuthReturn()) return null;
 
-  const configs = buildConfigs(
-    circle,
-    pending.deviceToken,
-    pending.deviceEncryptionKey
-  );
+  const provider = pending.provider ?? 'google';
+  const label = PROVIDER_LABEL[provider];
 
   const result = await new Promise<CircleSession>((resolve, reject) => {
     const timer = setTimeout(() => {
-      clearPendingLogin();
+      clearPendingLogin(scope);
       reject(
         new Error(
-          'Timed out waiting for Google to complete sign-in. Check that your redirect URI is registered in both Google Cloud and the Circle console.'
+          `Timed out waiting for ${label} to complete sign-in. Check that your redirect URI is registered with ${label} and in Circle Console.`
         )
       );
     }, LOGIN_CALLBACK_TIMEOUT_MS);
 
-    getCircleSdk(configs, (error, loginResult) => {
-      clearTimeout(timer);
-      clearPendingLogin();
-      clearOAuthReturnFromAddressBar();
+    const settle = settleLogin(label, pending.chainId, resolve, reject);
 
-      if (error) {
-        reject(
-          new Error(
-            `Google sign-in failed${
-              error.code !== undefined ? ` (code ${error.code})` : ''
-            }: ${error.message}`
-          )
-        );
-        return;
+    getCircleSdkFor(
+      circle,
+      socialLoginConfigs(circle, provider, pending),
+      (error, loginResult) => {
+        clearTimeout(timer);
+        clearPendingLogin(scope);
+        clearOAuthReturnFromAddressBar();
+        settle(error, loginResult);
       }
-
-      if (!loginResult?.userToken || !loginResult?.encryptionKey) {
-        reject(new Error('Google sign-in returned an incomplete result.'));
-        return;
-      }
-
-      resolve({
-        userToken: loginResult.userToken,
-        encryptionKey: loginResult.encryptionKey,
-        refreshToken: loginResult.refreshToken,
-        email:
-          'oAuthInfo' in loginResult
-            ? loginResult.oAuthInfo?.socialUserInfo?.email
-            : undefined,
-        chainId: pending.chainId,
-        createdAt: Date.now(),
-      });
-    }).catch((sdkError) => {
+    ).catch((sdkError) => {
       clearTimeout(timer);
       reject(sdkError);
     });
   });
 
-  saveSession(result);
+  saveSession(scope, result);
+  emitCircleEvent(() =>
+    circle.events.onLogin?.({
+      environment: circle.environment,
+      method: provider,
+      email: result.email,
+    })
+  );
   return result;
 };
 
+// Refresh at most daily; tokens last 14 days.
+const REFRESH_AFTER_MS = 24 * 60 * 60 * 1000;
+
+const refreshing = new Map<string, Promise<CircleSession | null>>();
+
 /**
- * Returns the user's wallet on the requested chain, provisioning one if this is
- * their first visit.
- *
- * `initializeUser` only hands back a challenge, and the wallet does not exist
- * until the authenticated user approves it in Circle's hosted UI.
+ * Renews the user token once it is a day old, so an active user is never
+ * logged out at the 14-day mark. Returns `null` when Circle rejects the token,
+ * after clearing the session. Other failures keep the current session.
+ */
+export const refreshSessionIfStale = ({
+  circle,
+  adapter,
+  session,
+}: {
+  circle: ResolvedCircleConfig;
+  adapter: CircleBackendAdapter;
+  session: CircleSession;
+}): Promise<CircleSession | null> => {
+  if (
+    !session.refreshToken ||
+    !adapter.refreshUserToken ||
+    Date.now() - session.createdAt < REFRESH_AFTER_MS
+  ) {
+    return Promise.resolve(session);
+  }
+
+  const key = `${circle.environment}:${circle.appId ?? ''}`;
+  const inFlight = refreshing.get(key);
+  if (inFlight) return inFlight;
+
+  const scope = sessionScope(circle);
+  const run = (async () => {
+    try {
+      const sdk = await getCircleSdkFor(circle);
+      const result = await adapter.refreshUserToken!({
+        userToken: session.userToken,
+        refreshToken: session.refreshToken!,
+        deviceId: await sdk.getDeviceId(),
+      });
+      const next: CircleSession = {
+        ...session,
+        userToken: result.userToken,
+        encryptionKey: result.encryptionKey ?? session.encryptionKey,
+        refreshToken: result.refreshToken ?? session.refreshToken,
+        createdAt: Date.now(),
+      };
+      saveSession(scope, next);
+      return next;
+    } catch (error) {
+      if (
+        error instanceof CircleBackendError &&
+        (error.status === 401 || String(error.code) === '155104')
+      ) {
+        clearSession(scope);
+        return null;
+      }
+      return session;
+    } finally {
+      refreshing.delete(key);
+    }
+  })();
+
+  refreshing.set(key, run);
+  return run;
+};
+
+// Circle: "User already initialized".
+const isAlreadyInitialized = (error: unknown) =>
+  error instanceof CircleBackendError && String(error.code) === '155106';
+
+/**
+ * Returns the user's wallet on the chain, creating one if needed. Creation is a
+ * challenge the user approves in Circle's hosted UI.
  */
 export const ensureWallet = async ({
   circle,
@@ -297,23 +482,63 @@ export const ensureWallet = async ({
       `Chain ${chainId} is not mapped to a Circle blockchain. Add it via \`circle.chains\`.`
     );
   }
+  if (environmentOfBlockchain(blockchain) !== circle.environment) {
+    throw new Error(
+      `${blockchain} is a ${environmentOfBlockchain(
+        blockchain
+      )} chain, but Circle is configured for ${
+        circle.environment
+      }. Choose a ${circle.environment} chain or change \`circle.environment\`.`
+    );
+  }
 
+  const scope = sessionScope(circle);
   const { userToken, encryptionKey } = session;
-  const sdk = await getCircleSdk();
+  const sdk = await getCircleSdkFor(circle);
   sdk.setAuthentication({ userToken, encryptionKey });
 
-  const existing = (await adapter.listWallets({ userToken })).find(
-    (wallet) => wallet.blockchain === blockchain
-  );
+  const wallets = await adapter.listWallets({ userToken });
+  const existing = wallets.find((wallet) => wallet.blockchain === blockchain);
   if (existing) {
-    updateSession({ walletId: existing.id, address: existing.address, chainId });
+    updateSession(scope, {
+      walletId: existing.id,
+      address: existing.address,
+      chainId,
+    });
+    emitCircleEvent(() =>
+      circle.events.onWallet?.({
+        environment: circle.environment,
+        wallet: existing,
+        created: false,
+      })
+    );
     return existing;
   }
 
-  const { challengeId } = await adapter.initializeUser({
-    userToken,
-    blockchain,
-  });
+  const input = { userToken, blockchain, accountType: circle.accountType };
+
+  // `initializeUser` works only once per user; later wallets use `createWallet`.
+  const createForExistingUser = (): Promise<CircleChallengeResponse> => {
+    if (!adapter.createWallet) {
+      throw new Error(
+        `This user already has a Circle wallet. Add \`createWallet\` to your Circle backend adapter to create one on ${blockchain}.`
+      );
+    }
+    return adapter.createWallet(input);
+  };
+
+  let challenge: CircleChallengeResponse;
+  if (wallets.length > 0) {
+    challenge = await createForExistingUser();
+  } else {
+    try {
+      challenge = await adapter.initializeUser(input);
+    } catch (error) {
+      if (!isAlreadyInitialized(error)) throw error;
+      challenge = await createForExistingUser();
+    }
+  }
+  const { challengeId } = challenge;
 
   await executeChallenge(sdk, challengeId);
 
@@ -327,6 +552,17 @@ export const ensureWallet = async ({
     );
   }
 
-  updateSession({ walletId: created.id, address: created.address, chainId });
+  updateSession(scope, {
+    walletId: created.id,
+    address: created.address,
+    chainId,
+  });
+  emitCircleEvent(() =>
+    circle.events.onWallet?.({
+      environment: circle.environment,
+      wallet: created,
+      created: true,
+    })
+  );
   return created;
 };

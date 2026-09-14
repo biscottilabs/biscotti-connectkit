@@ -1,21 +1,36 @@
-import { getDefaultConfig } from '@biscottidex/connectkit';
+import { getDefaultConfig, type CircleEnvironment } from '@biscottidex/connectkit';
 import { createConfig } from 'wagmi';
-import { mainnet, polygon, optimism, arbitrum, baseSepolia } from 'wagmi/chains';
+import {
+  arbitrum,
+  arcTestnet,
+  base,
+  baseSepolia,
+  mainnet,
+  optimism,
+  polygon,
+} from 'wagmi/chains';
 
 export const config = createConfig(
   getDefaultConfig({
-    // Base Sepolia is listed because Circle sandbox API keys only work against
-    // testnets — a sandbox key on mainnet fails with an opaque auth error.
     appName: 'ConnectKit Next.js demo',
-    chains: [mainnet, polygon, optimism, arbitrum, baseSepolia],
+    chains: [mainnet, polygon, optimism, arbitrum, base, baseSepolia, arcTestnet],
     walletConnectProjectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID!,
-    // Declared once. The connector carries these options, so ConnectKitProvider
-    // reads them back without needing a second copy.
     circle: {
-      appId: process.env.NEXT_PUBLIC_CIRCLE_APP_ID,
+      environment: process.env.NEXT_PUBLIC_CIRCLE_ENVIRONMENT as
+        | CircleEnvironment
+        | undefined,
       google: { clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID },
       methods: ['google', 'email'],
-      defaultChainId: baseSepolia.id,
+      environments: {
+        testnet: {
+          appId: process.env.NEXT_PUBLIC_CIRCLE_TESTNET_APP_ID,
+          defaultChainId: arcTestnet.id,
+        },
+        mainnet: {
+          appId: process.env.NEXT_PUBLIC_CIRCLE_MAINNET_APP_ID,
+          defaultChainId: base.id,
+        },
+      },
     },
   })
 );

@@ -9,6 +9,8 @@ import type {
   EmailLoginResult,
 } from '@circle-fin/w3s-pw-web-sdk/dist/src/types';
 
+import type { ResolvedCircleConfig } from './config';
+
 export type CircleSdk = W3SSdk;
 export type CircleChallengeResult =
   | ChallengeResult
@@ -18,7 +20,7 @@ export type CircleChallengeResult =
 /**
  * The Circle SDK is loaded on demand rather than imported at module scope.
  *
- * Two reasons. It is browser-only — it drives a hosted iframe and touches
+ * Two reasons. It is browser-only: it drives a hosted iframe and touches
  * `window` in its constructor, so importing it eagerly breaks SSR. And it pulls
  * in `firebase` transitively (Circle uses it for Apple login), which is far too
  * much weight to put in the bundle of every app that merely imports ConnectKit.
@@ -65,7 +67,7 @@ export const loadCircleSdk = (): Promise<CircleSdkModule> => {
         ChallengeType: types.ChallengeType as unknown as Record<string, string>,
       }))
       .catch((error) => {
-        // Reset so a later attempt can retry — a failed chunk fetch should not
+        // Reset so a later attempt can retry; a failed chunk fetch should not
         // permanently poison the integration.
         modulePromise = null;
         const originalMessage =
@@ -88,22 +90,41 @@ export const loadCircleSdk = (): Promise<CircleSdkModule> => {
 let instance: W3SSdk | null = null;
 
 /**
- * One SDK instance per page. The SDK owns a hosted iframe and internal
- * singleton state, so constructing it repeatedly leaves orphaned frames behind.
+ * `appId` is set on every call: after a refresh, a challenge could otherwise
+ * run on an instance that never received it.
  */
 export const getCircleSdk = async (
+  appId: string,
   configs?: Configs,
   onLoginComplete?: LoginCompleteCallback
 ): Promise<W3SSdk> => {
   const { W3SSdk: Sdk } = await loadCircleSdk();
 
   if (!instance) {
-    instance = new Sdk(configs, onLoginComplete);
+    instance = new Sdk(configs ?? { appSettings: { appId } }, onLoginComplete);
   } else if (configs) {
     instance.updateConfigs(configs, onLoginComplete);
+  } else {
+    instance.setAppSettings({ appId });
   }
 
   return instance;
+};
+
+/** Also applies `circle.appearance` to Circle's hosted screens. */
+export const getCircleSdkFor = async (
+  circle: ResolvedCircleConfig,
+  configs?: Configs,
+  onLoginComplete?: LoginCompleteCallback
+): Promise<W3SSdk> => {
+  const sdk = await getCircleSdk(circle.appId ?? '', configs, onLoginComplete);
+  const { themeColor, localizations, resources, customLinks } =
+    circle.appearance ?? {};
+  if (themeColor) sdk.setThemeColor(themeColor);
+  if (localizations) sdk.setLocalizations(localizations);
+  if (resources) sdk.setResources(resources);
+  if (customLinks) sdk.setCustomLinks(customLinks);
+  return sdk;
 };
 
 /** Test seam and hard-reset for logout. */
@@ -118,7 +139,7 @@ export type CircleLoginResult = SocialLoginResult | EmailLoginResult;
  *
  * A challenge is how Circle gates sensitive actions behind its hosted
  * confirmation UI. The user authenticates or approves as required by their
- * configured method, and the result — a signature or transaction hash — arrives
+ * configured method, and the result (a signature or transaction hash) arrives
  * here. Anything other than COMPLETE is a failure, including PENDING.
  */
 export const executeChallenge = async (
@@ -167,7 +188,7 @@ type MaybeSigned = {
  * Pulls the signature out of a completed challenge.
  *
  * Circle returns it inline on the challenge result, so a signature never needs
- * polling — but the field is optional on the shared result type, hence the
+ * polling, but the field is optional on the shared result type, hence the
  * explicit check rather than a cast.
  */
 export const extractSignature = (result: CircleChallengeResult): string => {

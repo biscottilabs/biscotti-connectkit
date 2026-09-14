@@ -1,3 +1,47 @@
+# Unreleased
+
+## Added
+
+- Circle testnet and mainnet environments. Declare both under `circle.environments`
+  and pick one with `circle.environment`. Sessions are stored per environment and App ID.
+- `@biscottidex/connectkit/server`: `createCircleHandler`, `createCircleNodeMiddleware`
+  and `readCircleServerEnv`. One handler serves both environments, selected by the
+  `X-Circle-Environment` header, and rejects keys or chains from the wrong environment.
+  Includes an `authorize` hook.
+- `circle.accountType` (`EOA` or `SCA`), `useCircleConfig`, `useCircleLogin().environment`,
+  and Monad (`MONAD`, `MONAD-TESTNET`) chain mappings.
+- Wallets on additional chains: users who already have a Circle wallet get new ones via
+  `POST /user/wallets` (`createWallet` adapter method, `create-wallet` route), including
+  when switching to a chain where they have none.
+- Automatic user token refresh once a session is a day old (`refreshUserToken` adapter
+  method, `refresh-token` route).
+- `circle.storage` (`session`, `local`, or custom), `circle.appearance` for Circle's hosted
+  screens, and `onLogin`, `onWallet`, `onSignOut`, `onError` callbacks.
+- Apple and Facebook sign-in (`circle.apple`, `circle.facebook`, `signInWithApple`,
+  `signInWithFacebook`). Apple's device token is fetched ahead of the click so its popup
+  is not blocked.
+- A *Testnet* badge on the Circle screens when running against testnet.
+- Test suite for the Circle integration (`bun run test`), run in CI.
+- Preflight errors for an invalid or ambiguous environment, a default chain from the
+  other environment, and a default chain missing from the wagmi `chains`.
+
+## Breaking
+
+- `preflightCircleConfig(circle, appChainIds)` takes the app's chain ids instead of a
+  single chain id.
+- `readCircleSession` takes a `{ environment, appId, storage }` scope.
+  `clearCircleSession({ environment?, storage? })` with no environment clears both.
+- `resumeGoogleLogin` and `shouldResumeGoogleLogin` are now `resumeSocialLogin` and
+  `shouldResumeSocialLogin`, covering Facebook too.
+- Diagnostics name variables without a framework prefix, e.g. `CIRCLE_TESTNET_APP_ID`
+  instead of `NEXT_PUBLIC_CIRCLE_TESTNET_APP_ID`.
+
+## Fixed
+
+- Circle challenges run after a page refresh now set the App ID on the SDK first.
+- Signing in with a chain other than the user's first wallet no longer fails with
+  "user already initialized" (155106).
+
 # 0.0.1
 
 This is the first release under the Biscotti Finance name. The package is a fork of

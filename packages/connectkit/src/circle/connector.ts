@@ -2,8 +2,14 @@ import { createConnector } from '@wagmi/core';
 import { formatEther, getAddress, isHex, type Address, type Chain } from 'viem';
 
 import { resolveBackendAdapter } from './backend';
-import { toCircleBlockchain } from './chains';
-import { beginGoogleLogin } from './login';
+import { environmentOfBlockchain, toCircleBlockchain } from './chains';
+import { emitCircleEvent, resolveCircleConfig } from './config';
+import {
+  beginGoogleLogin,
+  ensureWallet,
+  refreshSessionIfStale,
+  sessionScope,
+} from './login';
 import {
   createCircleProvider,
   CircleNotConnectedError,
@@ -13,13 +19,12 @@ import {
   executeChallenge,
   extractSignature,
   extractTxHash,
-  getCircleSdk,
+  getCircleSdkFor,
   resetCircleSdk,
 } from './sdk';
 import {
   clearSession,
-  readSession,
-  updateSession,
+  readSession as readScopedSession,
   type CircleSession,
 } from './session';
 import type { CircleOptions } from './types';
@@ -35,7 +40,7 @@ export type CircleConnectorParameters = {
  *
  * The connector is a thin adapter over the session that the login flow writes:
  * it does not own authentication. That split matters because Google sign-in
- * navigates the entire page away, which no `connect()` promise can survive — so
+ * navigates the entire page away, which no `connect()` promise can survive, so
  * `connect()` either finds an existing session and returns immediately, or
  * kicks off the redirect and lets the app reconnect on the way back.
  */
@@ -46,13 +51,30 @@ export type CircleConnectorProperties = {
 
 export const circleConnector = ({ circle }: CircleConnectorParameters) =>
   createConnector<CircleProvider, CircleConnectorProperties>((config) => {
-    const adapter = resolveBackendAdapter(circle);
+    const resolved = resolveCircleConfig(
+      circle,
+      config.chains.map((chain) => chain.id)
+    );
+    const adapter = resolveBackendAdapter(resolved);
+    const scope = sessionScope(resolved);
+    const readSession = () => readScopedSession(scope);
 
-    const fallbackChainId = (): number =>
-      circle.defaultChainId ?? config.chains[0].id;
+    const fallbackChainId = (): number => resolved.defaultChainId;
 
     const currentChainId = (): number =>
       readSession()?.chainId ?? fallbackChainId();
+
+    const activeSession = async (): Promise<CircleSession | null> => {
+      const stored = readSession();
+      if (!stored) return null;
+      const session = await refreshSessionIfStale({
+        circle: resolved,
+        adapter,
+        session: stored,
+      });
+      if (!session) config.emitter.emit('disconnect');
+      return session;
+    };
 
     /**
      * Every signing operation follows the same shape: ask the backend for a
@@ -62,12 +84,12 @@ export const circleConnector = ({ circle }: CircleConnectorParameters) =>
     const runChallenge = async (
       request: (session: CircleSession) => Promise<{ challengeId: string }>
     ) => {
-      const session = readSession();
+      const session = await activeSession();
       if (!session?.walletId) throw new CircleNotConnectedError();
 
       const { challengeId } = await request(session);
 
-      const sdk = await getCircleSdk();
+      const sdk = await getCircleSdkFor(resolved);
       sdk.setAuthentication({
         userToken: session.userToken,
         encryptionKey: session.encryptionKey,
@@ -129,7 +151,7 @@ export const circleConnector = ({ circle }: CircleConnectorParameters) =>
             amount: tx.value
               ? formatEther(BigInt(tx.value as string | number | bigint))
               : undefined,
-            feeLevel: circle.feeLevel ?? 'MEDIUM',
+            feeLevel: resolved.feeLevel,
           })
         );
 
@@ -144,7 +166,7 @@ export const circleConnector = ({ circle }: CircleConnectorParameters) =>
 
     return {
       id: CIRCLE_CONNECTOR_ID,
-      name: circle.name ?? 'Sign in with Circle',
+      name: resolved.name,
       type: CIRCLE_CONNECTOR_ID,
       circleOptions: circle,
 
@@ -171,7 +193,7 @@ export const circleConnector = ({ circle }: CircleConnectorParameters) =>
           };
         }
 
-        if (!(circle.methods ?? ['google', 'email']).includes('google')) {
+        if (!resolved.methods.includes('google')) {
           throw new Error(
             'This Circle connector does not enable Google. Start email authentication with `useCircleLogin().signInWithEmail(email)` before connecting.'
           );
@@ -181,7 +203,7 @@ export const circleConnector = ({ circle }: CircleConnectorParameters) =>
         // by starting Google. Apps that offer multiple methods should use the
         // ConnectKit method picker or the explicit useCircleLogin functions.
         await beginGoogleLogin({
-          circle,
+          circle: resolved,
           adapter,
           chainId: chainId ?? fallbackChainId(),
         });
@@ -192,8 +214,14 @@ export const circleConnector = ({ circle }: CircleConnectorParameters) =>
       },
 
       async disconnect() {
-        clearSession();
+        const hadSession = readSession() !== null;
+        clearSession(scope);
         resetCircleSdk();
+        if (hadSession) {
+          emitCircleEvent(() =>
+            resolved.events.onSignOut?.({ environment: resolved.environment })
+          );
+        }
       },
 
       async getAccounts() {
@@ -221,34 +249,36 @@ export const circleConnector = ({ circle }: CircleConnectorParameters) =>
           throw new Error(`Chain ${chainId} is not configured in this app.`);
         }
 
-        const session = readSession();
+        const session = await activeSession();
         if (!session) {
           throw new Error('Sign in with Circle before switching chains.');
         }
 
-        const blockchain = toCircleBlockchain(chainId, circle.chains);
+        const blockchain = toCircleBlockchain(chainId, resolved.chains);
         if (!blockchain) {
           throw new Error(
             `${chain.name} has no Circle blockchain mapping. Add one via \`circle.chains\`.`
           );
         }
 
-        // A Circle wallet belongs to exactly one blockchain, so switching chains
-        // means switching wallets — not re-pointing the existing one.
-        const target = (
-          await adapter.listWallets({ userToken: session.userToken })
-        ).find((wallet) => wallet.blockchain === blockchain);
-
-        if (!target) {
+        // The session and API key cannot reach the other environment.
+        if (environmentOfBlockchain(blockchain) !== resolved.environment) {
           throw new Error(
-            `You do not have a Circle wallet on ${chain.name} yet.`
+            `${chain.name} is a ${environmentOfBlockchain(
+              blockchain
+            )} chain, but this app's Circle environment is ${
+              resolved.environment
+            }.`
           );
         }
 
-        updateSession({
-          walletId: target.id,
-          address: target.address,
+        // A Circle wallet belongs to one blockchain, so switching chains means
+        // switching wallets. The user approves creating one if it is missing.
+        const target = await ensureWallet({
+          circle: resolved,
+          adapter,
           chainId,
+          session,
         });
 
         config.emitter.emit('change', {
@@ -274,7 +304,7 @@ export const circleConnector = ({ circle }: CircleConnectorParameters) =>
       },
 
       onDisconnect() {
-        clearSession();
+        clearSession(scope);
         config.emitter.emit('disconnect');
       },
     };

@@ -11,7 +11,7 @@ import {
 import type { CircleSession } from './session';
 
 /**
- * Circle exposes no EIP-1193 provider — it has a REST API and hosted
+ * Circle exposes no EIP-1193 provider; it has a REST API and hosted
  * authentication/confirmation UI.
  * This shim supplies one, which is what lets a Circle wallet behave like any
  * other wagmi connector.
@@ -20,7 +20,7 @@ import type { CircleSession } from './session';
  *
  *  - account/chain queries answered from the session we already hold
  *  - signing and transactions translated into Circle challenges (Phases 4-5)
- *  - everything else — the entire read surface — forwarded to the chain's RPC,
+ *  - everything else (the entire read surface) forwarded to the chain's RPC,
  *    reusing the transport the app already configured so Alchemy/Infura keys
  *    and rate limits are honoured rather than bypassed
  */
@@ -50,7 +50,7 @@ export type CircleProvider = {
   request: <T = unknown>(args: RequestArgs) => Promise<T>;
   /**
    * wagmi probes for these on every provider. Circle emits no provider-level
-   * events — account and chain changes originate from our own connector — so
+   * events (account and chain changes originate from our own connector), so
    * they are inert rather than absent, which keeps callers from crashing.
    */
   on: (event: string, listener: (...args: unknown[]) => void) => void;
@@ -125,7 +125,7 @@ export const createCircleProvider = (
 
       case 'personal_sign': {
         if (!deps.signMessage) throw new CircleMethodNotSupportedError(method);
-        // personal_sign params are [message, address] — the reverse of eth_sign.
+        // personal_sign params are [message, address], the reverse of eth_sign.
         const [message] = params as [string, string];
         return (await deps.signMessage(message)) as T;
       }

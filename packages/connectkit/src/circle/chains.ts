@@ -1,14 +1,6 @@
 /**
- * Circle identifies chains by its own string enum rather than by EIP-155 chain
- * id, so every call that crosses the Circle API boundary needs a translation in
- * one direction or the other:
- *
- *  - outbound: wagmi gives us a numeric `chainId`, Circle wants `"ARC-TESTNET"`
- *  - inbound:  `listWallets` returns `"ARC-TESTNET"`, wagmi wants `5042002`
- *
- * Only EVM chains are mapped. Circle also supports Solana, NEAR and Aptos, but
- * those cannot back an EIP-1193 provider and are therefore out of scope for the
- * connector.
+ * Circle names chains with its own identifiers (`BASE`, `ARC-TESTNET`), not
+ * EIP-155 ids. Only EVM chains are mapped, since the connector is EIP-1193.
  */
 export type CircleBlockchain =
   | 'ETH'
@@ -25,15 +17,29 @@ export type CircleBlockchain =
   | 'OP-SEPOLIA'
   | 'UNI'
   | 'UNI-SEPOLIA'
-  | 'ARC-TESTNET';
+  | 'MONAD'
+  | 'MONAD-TESTNET'
+  | 'ARC-TESTNET'
+  /** Other EVM chains. Circle signs but does not broadcast, so no transactions. */
+  | 'EVM'
+  | 'EVM-TESTNET';
 
 /**
- * Chains whose Circle identifier and EIP-155 id we have both verified. Circle
- * additionally exposes `MONAD` and the generic `EVM` / `EVM-TESTNET` buckets;
- * those are deliberately absent rather than guessed at, because a wrong chain
- * id here routes a signature request at the wrong network. Use `circle.chains`
- * in ConnectKitOptions to add them once confirmed.
+ * Circle's two separate environments. The API key selects one: `TEST_API_KEY:`
+ * works only on testnets, `LIVE_API_KEY:` only on mainnets.
  */
+export type CircleEnvironment = 'testnet' | 'mainnet';
+
+export const CIRCLE_ENVIRONMENTS: readonly CircleEnvironment[] = [
+  'testnet',
+  'mainnet',
+];
+
+export const isCircleEnvironment = (
+  value: unknown
+): value is CircleEnvironment => value === 'testnet' || value === 'mainnet';
+
+/** Verified pairs only. A wrong id would send signatures to the wrong network. */
 export const circleChainsByChainId: Record<number, CircleBlockchain> = {
   1: 'ETH',
   11155111: 'ETH-SEPOLIA',
@@ -45,30 +51,31 @@ export const circleChainsByChainId: Record<number, CircleBlockchain> = {
   421614: 'ARB-SEPOLIA',
   8453: 'BASE',
   84532: 'BASE-SEPOLIA',
-  5042002: 'ARC-TESTNET',
   10: 'OP',
   11155420: 'OP-SEPOLIA',
   130: 'UNI',
   1301: 'UNI-SEPOLIA',
+  143: 'MONAD',
+  10143: 'MONAD-TESTNET',
+  5042002: 'ARC-TESTNET',
 };
 
 export type CircleChainMap = Record<number, CircleBlockchain>;
 
-/**
- * Resolves the Circle identifier for a chain id, honouring any app-supplied
- * overrides/additions first so a consumer can support a chain we do not ship.
- */
+// Every Circle testnet identifier has one of these suffixes; no mainnet one does.
+const TESTNET_SUFFIX = /-(TESTNET|SEPOLIA|AMOY|FUJI|DEVNET)$/;
+
+export const environmentOfBlockchain = (
+  blockchain: string
+): CircleEnvironment =>
+  TESTNET_SUFFIX.test(blockchain) ? 'testnet' : 'mainnet';
+
 export const toCircleBlockchain = (
   chainId: number,
   overrides?: CircleChainMap
 ): CircleBlockchain | undefined =>
   overrides?.[chainId] ?? circleChainsByChainId[chainId];
 
-/**
- * Inverse of {@link toCircleBlockchain}. Returns `undefined` for chains we do
- * not map — including the non-EVM ones — so callers can skip wallets the
- * connector cannot represent instead of surfacing a bogus chain id.
- */
 export const toChainId = (
   blockchain: string,
   overrides?: CircleChainMap
@@ -84,3 +91,11 @@ export const isCircleSupportedChain = (
   chainId: number,
   overrides?: CircleChainMap
 ): boolean => toCircleBlockchain(chainId, overrides) !== undefined;
+
+export const environmentOfChain = (
+  chainId: number,
+  overrides?: CircleChainMap
+): CircleEnvironment | undefined => {
+  const blockchain = toCircleBlockchain(chainId, overrides);
+  return blockchain ? environmentOfBlockchain(blockchain) : undefined;
+};

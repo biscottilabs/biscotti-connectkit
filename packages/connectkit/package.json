@@ -15,9 +15,16 @@
   },
   "type": "module",
   "exports": {
-    "types": "./build/index.d.ts",
-    "import": "./build/index.es.js",
-    "default": "./build/index.es.js"
+    ".": {
+      "types": "./build/index.d.ts",
+      "import": "./build/index.es.js",
+      "default": "./build/index.es.js"
+    },
+    "./server": {
+      "types": "./build/server/index.d.ts",
+      "import": "./build/server.es.js",
+      "default": "./build/server.es.js"
+    }
   },
   "types": "./build/index.d.ts",
   "engines": {
@@ -32,7 +39,8 @@
     "start": "rollup --config rollup.config.dev.js -w",
     "dev": "rollup --config rollup.config.dev.js -w",
     "build": "rm -rf build && rollup --config rollup.config.prod.js",
-    "lint": "eslint src --ext .ts,.tsx"
+    "lint": "eslint src --ext .ts,.tsx",
+    "test": "bun test ./test"
   },
   "keywords": [
     "ens",

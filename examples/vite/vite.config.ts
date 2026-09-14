@@ -1,15 +1,16 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { nodePolyfills } from 'vite-plugin-node-polyfills'
-import { circleDevServer } from './circleDevServer'
+import {
+  createCircleHandler,
+  createCircleNodeMiddleware,
+  readCircleServerEnv
+} from '@biscottidex/connectkit/server'
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
-  // Passing an empty prefix loads the server-only CIRCLE_API_KEY too. Only the
-  // VITE_* subset is exposed to browser code by Vite.
+  // Empty prefix also loads the server-only CIRCLE_*_API_KEY values.
   const env = loadEnv(mode, process.cwd(), '')
-  const circleEnvironment =
-    env.VITE_CIRCLE_ENVIRONMENT === 'live' ? 'live' : 'sandbox'
 
   return {
     // OAuth redirect URIs must match exactly. Fail instead of silently moving
@@ -44,11 +45,17 @@ export default defineConfig(({ mode }) => {
       // process, Buffer, and the other Node primitives those modules import.
       nodePolyfills(),
       react(),
-      circleDevServer({
-        apiKey: env.CIRCLE_API_KEY,
-        environment: circleEnvironment,
-        configuredEnvironment: env.VITE_CIRCLE_ENVIRONMENT
-      })
+      {
+        name: 'circle-dev-server',
+        apply: 'serve',
+        configureServer(server) {
+          server.middlewares.use(
+            createCircleNodeMiddleware(
+              createCircleHandler(readCircleServerEnv(env))
+            )
+          )
+        }
+      }
     ]
   }
 })

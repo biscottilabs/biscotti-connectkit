@@ -28,6 +28,7 @@
     "build:ci": "bun run build.js && bun run --filter @biscottidex/connectkit build && bun run --filter @biscottidex/connectkit-next-siwe build && bun run build:examples && cp README.md packages/connectkit/README.md",
     "build:all": "bun run build:ci",
     "lint:ci": "bun run --filter '*' --if-present lint",
+    "test": "bun run --filter @biscottidex/connectkit test",
     "lint:all": "bun run lint:ci"
   },
   "devDependencies": {

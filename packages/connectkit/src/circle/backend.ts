@@ -1,3 +1,5 @@
+import type { CircleEnvironment } from './chains';
+import type { ResolvedCircleConfig } from './config';
 import type {
   CircleBackendAdapter,
   CircleChallengeResponse,
@@ -5,11 +7,14 @@ import type {
   CircleEmailOtpResult,
   CircleEndpointConfig,
   CircleHealthReport,
-  CircleOptions,
+  CircleRefreshTokenResult,
   CircleWallet,
 } from './types';
 
 export const CIRCLE_DEFAULT_BASE_PATH = '/api/circle';
+
+/** Lets one server holding both keys pick the right one per request. */
+export const CIRCLE_ENVIRONMENT_HEADER = 'X-Circle-Environment';
 
 export class CircleBackendError extends Error {
   readonly status: number;
@@ -40,7 +45,8 @@ export class CircleBackendError extends Error {
  * Circle API key to the client, which would let anyone drain the account.
  */
 export const createHttpBackendAdapter = (
-  config: CircleEndpointConfig = {}
+  config: CircleEndpointConfig = {},
+  environment?: CircleEnvironment
 ): CircleBackendAdapter => {
   const basePath = (config.basePath ?? CIRCLE_DEFAULT_BASE_PATH).replace(
     /\/$/,
@@ -58,13 +64,16 @@ export const createHttpBackendAdapter = (
         method: body === undefined ? 'GET' : 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(environment
+            ? { [CIRCLE_ENVIRONMENT_HEADER]: environment }
+            : {}),
           ...extraHeaders,
         },
         body: body === undefined ? undefined : JSON.stringify(body),
       });
     } catch (_error) {
       // A network-level failure usually means the route simply does not exist
-      // yet, which is the single most common setup mistake — say so plainly.
+      // yet, which is the single most common setup mistake, so say so plainly.
       throw new CircleBackendError(
         route,
         0,
@@ -118,6 +127,12 @@ export const createHttpBackendAdapter = (
     initializeUser: (input) =>
       request<CircleChallengeResponse>('/initialize-user', input),
 
+    createWallet: (input) =>
+      request<CircleChallengeResponse>('/create-wallet', input),
+
+    refreshUserToken: (input) =>
+      request<CircleRefreshTokenResult>('/refresh-token', input),
+
     listWallets: async (input) => {
       const result = await request<{ wallets: CircleWallet[] }>(
         '/wallets',
@@ -152,6 +167,7 @@ export const createHttpBackendAdapter = (
 
 /** Resolves the adapter for a given config, preferring an explicit override. */
 export const resolveBackendAdapter = (
-  circle: CircleOptions | undefined
+  circle: ResolvedCircleConfig
 ): CircleBackendAdapter =>
-  circle?.adapter ?? createHttpBackendAdapter(circle?.endpoints);
+  circle.adapter ??
+  createHttpBackendAdapter(circle.endpoints, circle.environment);
