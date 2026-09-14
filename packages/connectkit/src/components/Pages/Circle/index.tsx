@@ -38,7 +38,7 @@ import { CircleLogo, GoogleLogo, MailIcon, PinIcon } from '../../../assets/circl
 import { useCircleLogin } from '../../../circle/useCircleLogin';
 import { CIRCLE_CONNECTOR_ID } from '../../../circle/connector';
 import type { CircleConfigScope } from '../../../circle/types';
-import { useCircleOptions } from '../../../circle/useCircleOptions';
+import { useCircleConfig } from '../../../circle/useCircleOptions';
 import { hasBlockingIssues } from '../../../circle/preflight';
 import { useContext as useConnectKitContext } from '../../ConnectKit';
 
@@ -47,7 +47,7 @@ const CircleSignIn: React.FC = () => {
   const { triggerResize } = useConnectKitContext();
   const { connect } = useConnect();
   const connectors = useConnectors();
-  const circle = useCircleOptions();
+  const circle = useCircleConfig();
   const methods = circle?.methods ?? ['google', 'email'];
   const [selectedMethod, setSelectedMethod] = useState<'email' | null>(null);
   const [email, setEmail] = useState('');

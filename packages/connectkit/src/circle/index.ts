@@ -1,5 +1,10 @@
 export type {
   CircleOptions,
+  CircleEnvironmentOptions,
+  CircleGoogleOptions,
+  CircleAccountType,
+  CircleFeeLevel,
+  CircleEnvironmentHealth,
   CircleLoginMethod,
   CircleConfigScope,
   CircleConfigIssue,
@@ -13,13 +18,27 @@ export type {
 } from './types';
 export { CIRCLE_IMPLEMENTED_METHODS, isCircleEnabled } from './types';
 
-export type { CircleBlockchain, CircleChainMap } from './chains';
+export type {
+  CircleBlockchain,
+  CircleChainMap,
+  CircleEnvironment,
+} from './chains';
 export {
+  CIRCLE_ENVIRONMENTS,
   circleChainsByChainId,
+  environmentOfBlockchain,
+  environmentOfChain,
+  isCircleEnvironment,
   toCircleBlockchain,
   toChainId,
   isCircleSupportedChain,
 } from './chains';
+
+export { resolveCircleConfig, CIRCLE_DEFAULT_METHODS } from './config';
+export type {
+  ResolvedCircleConfig,
+  CircleEnvironmentSource,
+} from './config';
 
 export {
   preflightCircleConfig,
@@ -33,6 +52,7 @@ export {
   resolveBackendAdapter,
   CircleBackendError,
   CIRCLE_DEFAULT_BASE_PATH,
+  CIRCLE_ENVIRONMENT_HEADER,
 } from './backend';
 
 export {
@@ -58,7 +78,7 @@ export {
   clearSession,
   isSessionExpired,
 } from './session';
-export type { CircleSession } from './session';
+export type { CircleSession, CircleSessionScope } from './session';
 
 export { circleConnector, CIRCLE_CONNECTOR_ID } from './connector';
 export type { CircleConnectorParameters } from './connector';
@@ -70,6 +90,6 @@ export {
 } from './provider';
 export type { CircleProvider } from './provider';
 
-export { useCircleOptions } from './useCircleOptions';
+export { useCircleOptions, useCircleConfig } from './useCircleOptions';
 export { useCircleLogin } from './useCircleLogin';
 export type { CircleLoginStatus, UseCircleLoginResult } from './useCircleLogin';

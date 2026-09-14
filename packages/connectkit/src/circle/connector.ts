@@ -2,8 +2,9 @@ import { createConnector } from '@wagmi/core';
 import { formatEther, getAddress, isHex, type Address, type Chain } from 'viem';
 
 import { resolveBackendAdapter } from './backend';
-import { toCircleBlockchain } from './chains';
-import { beginGoogleLogin } from './login';
+import { environmentOfBlockchain, toCircleBlockchain } from './chains';
+import { resolveCircleConfig } from './config';
+import { beginGoogleLogin, sessionScope } from './login';
 import {
   createCircleProvider,
   CircleNotConnectedError,
@@ -18,7 +19,7 @@ import {
 } from './sdk';
 import {
   clearSession,
-  readSession,
+  readSession as readScopedSession,
   updateSession,
   type CircleSession,
 } from './session';
@@ -46,10 +47,15 @@ export type CircleConnectorProperties = {
 
 export const circleConnector = ({ circle }: CircleConnectorParameters) =>
   createConnector<CircleProvider, CircleConnectorProperties>((config) => {
-    const adapter = resolveBackendAdapter(circle);
+    const resolved = resolveCircleConfig(
+      circle,
+      config.chains.map((chain) => chain.id)
+    );
+    const adapter = resolveBackendAdapter(resolved);
+    const scope = sessionScope(resolved);
+    const readSession = () => readScopedSession(scope);
 
-    const fallbackChainId = (): number =>
-      circle.defaultChainId ?? config.chains[0].id;
+    const fallbackChainId = (): number => resolved.defaultChainId;
 
     const currentChainId = (): number =>
       readSession()?.chainId ?? fallbackChainId();
@@ -67,7 +73,7 @@ export const circleConnector = ({ circle }: CircleConnectorParameters) =>
 
       const { challengeId } = await request(session);
 
-      const sdk = await getCircleSdk();
+      const sdk = await getCircleSdk(resolved.appId ?? '');
       sdk.setAuthentication({
         userToken: session.userToken,
         encryptionKey: session.encryptionKey,
@@ -129,7 +135,7 @@ export const circleConnector = ({ circle }: CircleConnectorParameters) =>
             amount: tx.value
               ? formatEther(BigInt(tx.value as string | number | bigint))
               : undefined,
-            feeLevel: circle.feeLevel ?? 'MEDIUM',
+            feeLevel: resolved.feeLevel,
           })
         );
 
@@ -144,7 +150,7 @@ export const circleConnector = ({ circle }: CircleConnectorParameters) =>
 
     return {
       id: CIRCLE_CONNECTOR_ID,
-      name: circle.name ?? 'Sign in with Circle',
+      name: resolved.name,
       type: CIRCLE_CONNECTOR_ID,
       circleOptions: circle,
 
@@ -171,7 +177,7 @@ export const circleConnector = ({ circle }: CircleConnectorParameters) =>
           };
         }
 
-        if (!(circle.methods ?? ['google', 'email']).includes('google')) {
+        if (!resolved.methods.includes('google')) {
           throw new Error(
             'This Circle connector does not enable Google. Start email authentication with `useCircleLogin().signInWithEmail(email)` before connecting.'
           );
@@ -181,7 +187,7 @@ export const circleConnector = ({ circle }: CircleConnectorParameters) =>
         // by starting Google. Apps that offer multiple methods should use the
         // ConnectKit method picker or the explicit useCircleLogin functions.
         await beginGoogleLogin({
-          circle,
+          circle: resolved,
           adapter,
           chainId: chainId ?? fallbackChainId(),
         });
@@ -192,7 +198,7 @@ export const circleConnector = ({ circle }: CircleConnectorParameters) =>
       },
 
       async disconnect() {
-        clearSession();
+        clearSession(resolved.environment);
         resetCircleSdk();
       },
 
@@ -226,10 +232,22 @@ export const circleConnector = ({ circle }: CircleConnectorParameters) =>
           throw new Error('Sign in with Circle before switching chains.');
         }
 
-        const blockchain = toCircleBlockchain(chainId, circle.chains);
+        const blockchain = toCircleBlockchain(chainId, resolved.chains);
         if (!blockchain) {
           throw new Error(
             `${chain.name} has no Circle blockchain mapping. Add one via \`circle.chains\`.`
+          );
+        }
+
+        // A Circle user exists in exactly one environment, so a chain from the
+        // other environment is unreachable with this session and API key.
+        if (environmentOfBlockchain(blockchain) !== resolved.environment) {
+          throw new Error(
+            `${chain.name} is a ${environmentOfBlockchain(
+              blockchain
+            )} chain, but this app's Circle environment is ${
+              resolved.environment
+            }.`
           );
         }
 
@@ -245,7 +263,7 @@ export const circleConnector = ({ circle }: CircleConnectorParameters) =>
           );
         }
 
-        updateSession({
+        updateSession(scope, {
           walletId: target.id,
           address: target.address,
           chainId,
@@ -274,7 +292,7 @@ export const circleConnector = ({ circle }: CircleConnectorParameters) =>
       },
 
       onDisconnect() {
-        clearSession();
+        clearSession(resolved.environment);
         config.emitter.emit('disconnect');
       },
     };

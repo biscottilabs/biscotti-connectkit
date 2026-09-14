@@ -1,4 +1,4 @@
-import type { CircleChainMap } from './chains';
+import type { CircleChainMap, CircleEnvironment } from './chains';
 
 /** Login methods Circle exposes for user-controlled wallets. */
 export type CircleLoginMethod = 'google' | 'email' | 'pin' | 'facebook' | 'apple';
@@ -7,6 +7,16 @@ export const CIRCLE_IMPLEMENTED_METHODS: CircleLoginMethod[] = [
   'google',
   'email',
 ];
+
+/**
+ * `EOA` is a plain key-pair wallet. `SCA` is an ERC-4337 smart account, which
+ * is what Circle Gas Station sponsorship requires. SCA wallets are deployed
+ * lazily on their first outbound transaction, so avoid them on Ethereum mainnet
+ * where that deployment is expensive.
+ */
+export type CircleAccountType = 'EOA' | 'SCA';
+
+export type CircleFeeLevel = 'LOW' | 'MEDIUM' | 'HIGH';
 
 /**
  * Where a piece of configuration belongs. Reported alongside preflight issues so
@@ -72,16 +82,23 @@ export type CircleChallengeResponse = {
   challengeId: string;
 };
 
-/**
- * Reported by the optional `/health` route. Values are never returned — only
- * whether the server can see them — so the probe is safe to call from the
- * browser and safe to leave enabled in production.
- */
-export type CircleHealthReport = {
+export type CircleEnvironmentHealth = {
   ok: boolean;
   missing?: Array<{ id: string; envVar?: string; scope: CircleConfigScope }>;
   /** Detailed safe-to-display configuration failures reported by the server. */
   issues?: CircleConfigIssue[];
+};
+
+/**
+ * Reported by the optional `/health` route. Values are never returned — only
+ * whether the server can see them — so the probe is safe to call from the
+ * browser and safe to leave enabled in production.
+ *
+ * Servers that support both Circle environments report each one under
+ * `environments`; the top-level fields describe the server as a whole.
+ */
+export type CircleHealthReport = CircleEnvironmentHealth & {
+  environments?: Partial<Record<CircleEnvironment, CircleEnvironmentHealth>>;
 };
 
 export interface CircleBackendAdapter {
@@ -97,6 +114,7 @@ export interface CircleBackendAdapter {
   initializeUser(input: {
     userToken: string;
     blockchain: string;
+    accountType?: CircleAccountType;
   }): Promise<CircleChallengeResponse>;
 
   listWallets(input: { userToken: string }): Promise<CircleWallet[]>;
@@ -120,13 +138,52 @@ export interface CircleBackendAdapter {
     destinationAddress: string;
     callData?: string;
     amount?: string;
-    feeLevel?: 'LOW' | 'MEDIUM' | 'HIGH';
+    feeLevel?: CircleFeeLevel;
   }): Promise<CircleChallengeResponse>;
 
   health?(): Promise<CircleHealthReport>;
 }
 
-export type CircleOptions = {
+export type CircleGoogleOptions = {
+  clientId?: string;
+  /** Defaults to `window.location.origin`. Must be registered in Google Cloud. */
+  redirectUri?: string;
+  /** Force the Google account chooser instead of silent re-auth. */
+  selectAccountPrompt?: boolean;
+};
+
+/**
+ * Settings that can differ between testnet and mainnet. Each may be given at
+ * the top level of `CircleOptions` (shared by both environments) and/or inside
+ * `environments.testnet` / `environments.mainnet`, which take precedence.
+ */
+export type CircleEnvironmentOptions = {
+  /** Circle Developer Console App ID. Public — safe in the browser. */
+  appId?: string;
+
+  /**
+   * Google OAuth Web client id. Public by design. Enable the same client ID in
+   * Circle Console; no Google credential secret belongs in browser config.
+   * Merged field by field with the top-level `google` object.
+   */
+  google?: CircleGoogleOptions;
+
+  /**
+   * Chain to provision the wallet on. Must belong to the environment. Defaults
+   * to the first app chain in that environment.
+   */
+  defaultChainId?: number;
+
+  /** Wallet type to create on first sign-in. Defaults to `EOA`. */
+  accountType?: CircleAccountType;
+
+  endpoints?: CircleEndpointConfig;
+
+  /** Escape hatch for non-HTTP backends. Takes precedence over `endpoints`. */
+  adapter?: CircleBackendAdapter;
+};
+
+export type CircleOptions = CircleEnvironmentOptions & {
   /**
    * Explicit kill switch. Omitting the whole `circle` object disables the
    * integration entirely; `enabled: false` lets an app keep its configuration
@@ -134,34 +191,27 @@ export type CircleOptions = {
    */
   enabled?: boolean;
 
-  /** Circle Developer Console App ID. Public — safe in the browser. */
-  appId?: string;
+  /**
+   * The active Circle environment. It must match the server's API key:
+   * `testnet` pairs with a `TEST_API_KEY:` key, `mainnet` with `LIVE_API_KEY:`.
+   *
+   * Required when `environments` configures both. Otherwise it is inferred
+   * from `environments`, then from the chains, and finally defaults to
+   * `testnet`.
+   */
+  environment?: CircleEnvironment;
 
   /**
-   * Google OAuth Web client id. Public by design. Enable the same client ID in
-   * Circle Console; no Google credential secret belongs in browser config.
+   * Per-environment settings. Declare both so a deployment switches between
+   * them by changing `environment` alone.
    */
-  google?: {
-    clientId?: string;
-    /** Defaults to `window.location.origin`. Must be registered in Google Cloud. */
-    redirectUri?: string;
-    /** Force the Google account chooser instead of silent re-auth. */
-    selectAccountPrompt?: boolean;
-  };
+  environments?: Partial<Record<CircleEnvironment, CircleEnvironmentOptions>>;
 
   /**
    * Authentication choices shown by ConnectKit. Defaults to
    * `['google', 'email']`. Unimplemented methods render as "coming soon".
    */
   methods?: CircleLoginMethod[];
-
-  endpoints?: CircleEndpointConfig;
-
-  /** Escape hatch for non-HTTP backends. Takes precedence over `endpoints`. */
-  adapter?: CircleBackendAdapter;
-
-  /** Chain to provision the wallet on. Defaults to the app's first chain. */
-  defaultChainId?: number;
 
   /** Add or override Circle chain identifiers. See `circle/chains.ts`. */
   chains?: CircleChainMap;
@@ -174,7 +224,7 @@ export type CircleOptions = {
    * level and rejects explicit gas fields, so any gas the caller sets is
    * ignored in favour of this. Defaults to `MEDIUM`.
    */
-  feeLevel?: 'LOW' | 'MEDIUM' | 'HIGH';
+  feeLevel?: CircleFeeLevel;
 };
 
 /**

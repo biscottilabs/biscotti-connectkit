@@ -15,9 +15,16 @@
   },
   "type": "module",
   "exports": {
-    "types": "./build/index.d.ts",
-    "import": "./build/index.es.js",
-    "default": "./build/index.es.js"
+    ".": {
+      "types": "./build/index.d.ts",
+      "import": "./build/index.es.js",
+      "default": "./build/index.es.js"
+    },
+    "./server": {
+      "types": "./build/server/index.d.ts",
+      "import": "./build/server.es.js",
+      "default": "./build/server.es.js"
+    }
   },
   "types": "./build/index.d.ts",
   "engines": {

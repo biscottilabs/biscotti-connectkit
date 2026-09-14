@@ -88,19 +88,26 @@ export const loadCircleSdk = (): Promise<CircleSdkModule> => {
 let instance: W3SSdk | null = null;
 
 /**
- * One SDK instance per page. The SDK owns a hosted iframe and internal
- * singleton state, so constructing it repeatedly leaves orphaned frames behind.
+ * One SDK instance per page. The SDK owns a hosted iframe and is a singleton
+ * internally, so constructing it again returns the same object.
+ *
+ * `appId` is required on every call, not just the first. The App ID differs
+ * between Circle environments, and a challenge executed after a page refresh
+ * would otherwise reach an instance that was never told which app it serves.
  */
 export const getCircleSdk = async (
+  appId: string,
   configs?: Configs,
   onLoginComplete?: LoginCompleteCallback
 ): Promise<W3SSdk> => {
   const { W3SSdk: Sdk } = await loadCircleSdk();
 
   if (!instance) {
-    instance = new Sdk(configs, onLoginComplete);
+    instance = new Sdk(configs ?? { appSettings: { appId } }, onLoginComplete);
   } else if (configs) {
     instance.updateConfigs(configs, onLoginComplete);
+  } else {
+    instance.setAppSettings({ appId });
   }
 
   return instance;

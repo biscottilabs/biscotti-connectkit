@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useChainId } from 'wagmi';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useConfig } from 'wagmi';
 
 import { useContext } from '../components/ConnectKit';
 import { resolveBackendAdapter } from './backend';
+import type { CircleEnvironment } from './chains';
 import {
   beginEmailLogin,
   beginGoogleLogin,
   ensureWallet,
   resumeGoogleLogin,
+  sessionScope,
 } from './login';
 import {
   hasBlockingIssues,
@@ -18,7 +20,7 @@ import {
 import { clearSession, readSession, type CircleSession } from './session';
 import { resetCircleSdk } from './sdk';
 import { isCircleEnabled, type CircleConfigIssue, type CircleWallet } from './types';
-import { useCircleOptions } from './useCircleOptions';
+import { useCircleConfig, useCircleOptions } from './useCircleOptions';
 
 const CIRCLE_HEALTH_TIMEOUT_MS = 2_500;
 
@@ -61,6 +63,8 @@ export type CircleLoginStatus =
 export type UseCircleLoginResult = {
   status: CircleLoginStatus;
   enabled: boolean;
+  /** The active Circle environment, or `undefined` when Circle is disabled. */
+  environment?: CircleEnvironment;
   issues: CircleConfigIssue[];
   /** Whether `issues` may be shown in the UI, or only logged. */
   canShowDiagnostics: boolean;
@@ -85,10 +89,13 @@ export type UseCircleLoginResult = {
  */
 export const useCircleLogin = (): UseCircleLoginResult => {
   const context = useContext();
-  const chainIdFromWagmi = useChainId();
-  const circle = useCircleOptions();
-  const enabled = isCircleEnabled(circle);
-  const chainId = circle?.defaultChainId ?? chainIdFromWagmi;
+  const { chains } = useConfig();
+  const options = useCircleOptions();
+  const circle = useCircleConfig();
+  const enabled = isCircleEnabled(options);
+  // The same default the connector falls back to, so the wallet provisioned
+  // here is the one the connector reports once wagmi connects.
+  const chainId = circle?.defaultChainId ?? chains[0].id;
 
   const [status, setStatus] = useState<CircleLoginStatus>(
     enabled ? 'checking' : 'disabled'
@@ -103,7 +110,10 @@ export const useCircleLogin = (): UseCircleLoginResult => {
 
   const authAttemptRef = useRef(0);
 
-  const adapter = resolveBackendAdapter(circle);
+  const adapter = useMemo(
+    () => (circle ? resolveBackendAdapter(circle) : undefined),
+    [circle]
+  );
   const canShowDiagnostics = shouldShowDiagnostics(context.debugMode);
 
   const fail = useCallback(
@@ -119,18 +129,21 @@ export const useCircleLogin = (): UseCircleLoginResult => {
 
   /** Preflight + backend health, merged into one issue list. */
   const check = useCallback(async (): Promise<CircleConfigIssue[]> => {
-    const clientIssues = preflightCircleConfig(circle, chainId);
+    const clientIssues = preflightCircleConfig(
+      options,
+      chains.map((chain) => chain.id)
+    );
 
     let serverIssues: CircleConfigIssue[] = [];
     try {
-      const report = adapter.health
+      const report = adapter?.health
         ? await withTimeout(
             adapter.health(),
             CIRCLE_HEALTH_TIMEOUT_MS,
             `The Circle backend health check timed out after ${CIRCLE_HEALTH_TIMEOUT_MS}ms.`
           )
         : undefined;
-      serverIssues = issuesFromHealth(report);
+      serverIssues = issuesFromHealth(report, circle?.environment);
     } catch (healthError) {
       // An unreachable health route is itself a useful diagnostic, but it must
       // not mask the client-side issues we already found.
@@ -151,7 +164,7 @@ export const useCircleLogin = (): UseCircleLoginResult => {
     const all = [...clientIssues, ...serverIssues];
     setIssues(all);
     return all;
-  }, [adapter, chainId, circle, context]);
+  }, [adapter, chains, circle, context, options]);
 
   useEffect(() => {
     if (!enabled) {
@@ -160,6 +173,12 @@ export const useCircleLogin = (): UseCircleLoginResult => {
     }
 
     let cancelled = false;
+
+    // Nothing from a previous environment may survive into this one.
+    setSession(null);
+    setWallet(null);
+    setError(null);
+    setStatus('checking');
 
     (async () => {
       const found = await check();
@@ -181,7 +200,7 @@ export const useCircleLogin = (): UseCircleLoginResult => {
           setStatus('awaitingPin');
           const provisioned = await ensureWallet({
             circle: circle!,
-            adapter,
+            adapter: adapter!,
             chainId,
             session: resumed,
           });
@@ -195,13 +214,18 @@ export const useCircleLogin = (): UseCircleLoginResult => {
         return;
       }
 
-      const stored = readSession();
+      // Sessions are stored per environment and App ID, so this can only ever
+      // return a session that the configured API key is able to use.
+      const stored = readSession(sessionScope(circle!));
       if (stored) {
-        // A Circle token and wallet belong to the environment/chain they were
-        // created for. Never present a stale Base mainnet wallet as connected
-        // after the app switches to Arc Testnet (or vice versa).
-        if (stored.chainId !== undefined && stored.chainId !== chainId) {
-          clearSession();
+        // Within one environment a session stays valid across chains, but its
+        // wallet is tied to one chain. If the app no longer lists that chain,
+        // the wallet cannot be represented, so start over.
+        if (
+          stored.chainId !== undefined &&
+          !chains.some((chain) => chain.id === stored.chainId)
+        ) {
+          clearSession(circle!.environment);
           resetCircleSdk();
           setSession(null);
           setWallet(null);
@@ -229,13 +253,15 @@ export const useCircleLogin = (): UseCircleLoginResult => {
     return () => {
       cancelled = true;
     };
-    // Intentionally keyed on `enabled` alone. React Strict Mode runs this effect
-    // twice in development; the first pass is cancelled before it can consume
-    // the one-shot OAuth record, and the second pass completes initialization.
-  }, [enabled]);
+    // Intentionally keyed on identity rather than on every option. React Strict
+    // Mode runs this effect twice in development; the first pass is cancelled
+    // before it can consume the one-shot OAuth record, and the second pass
+    // completes initialization. A change of environment or App ID is a
+    // different Circle app, so it re-runs against that app's stored session.
+  }, [enabled, circle?.environment, circle?.appId]);
 
   const signInWithGoogle = useCallback(async () => {
-    if (!enabled || !circle) return;
+    if (!enabled || !circle || !adapter) return;
 
     setError(null);
     setActiveMethod('google');
@@ -258,7 +284,7 @@ export const useCircleLogin = (): UseCircleLoginResult => {
 
   const signInWithEmail = useCallback(
     async (email: string) => {
-      if (!enabled || !circle) return;
+      if (!enabled || !circle || !adapter) return;
 
       const normalizedEmail = email.trim().toLowerCase();
       if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
@@ -314,18 +340,19 @@ export const useCircleLogin = (): UseCircleLoginResult => {
 
   const signOut = useCallback(() => {
     authAttemptRef.current += 1;
-    clearSession();
+    clearSession(circle?.environment);
     resetCircleSdk();
     setSession(null);
     setWallet(null);
     setError(null);
     setActiveMethod(null);
     setStatus(enabled ? 'ready' : 'disabled');
-  }, [enabled]);
+  }, [circle?.environment, enabled]);
 
   return {
     status,
     enabled,
+    environment: enabled ? circle?.environment : undefined,
     issues,
     canShowDiagnostics,
     session,

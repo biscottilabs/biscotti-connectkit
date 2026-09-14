@@ -1,3 +1,5 @@
+import { CIRCLE_ENVIRONMENTS, type CircleEnvironment } from './chains';
+
 /**
  * Session persistence for the Circle integration.
  *
@@ -9,6 +11,12 @@
  *    returns, because the device token it was configured with is gone.
  *  - `session`: the authenticated result, kept so a page refresh does not force
  *    the user back through Google while their token is still valid.
+ *
+ * Both are keyed by Circle environment. A testnet user token is meaningless to
+ * a mainnet API key (and vice versa), so an app that changes environment must
+ * not pick up the other environment's session — but it should not destroy it
+ * either, since switching back is common during development. Each record also
+ * remembers the App ID it was created under and is discarded if that changes.
  *
  * Storage is `sessionStorage`, not `localStorage`: the user token is a bearer
  * credential and should not outlive the browser tab. Note that any storage
@@ -30,10 +38,17 @@ const TOKEN_TTL_MS = 14 * 24 * 60 * 60 * 1000 - 5 * 60 * 1000;
 /** OAuth round trips are fast; anything older is a stale tab, not a redirect. */
 const PENDING_TTL_MS = 10 * 60 * 1000;
 
+/** Identifies which Circle app and environment a record belongs to. */
+export type CircleSessionScope = {
+  environment: CircleEnvironment;
+  appId?: string;
+};
+
 export type CirclePendingLogin = {
   deviceToken: string;
   deviceEncryptionKey: string;
   chainId: number;
+  appId?: string;
   createdAt: number;
 };
 
@@ -45,6 +60,8 @@ export type CircleSession = {
   walletId?: string;
   address?: string;
   chainId?: number;
+  environment?: CircleEnvironment;
+  appId?: string;
   createdAt: number;
 };
 
@@ -89,40 +106,75 @@ const remove = (key: string) => {
   }
 };
 
-export const savePendingLogin = (
-  pending: Omit<CirclePendingLogin, 'createdAt'>
-) => write(PENDING_KEY, { ...pending, createdAt: Date.now() });
+const keyFor = (base: string, environment: CircleEnvironment) =>
+  `${base}:${environment}`;
 
-export const readPendingLogin = (): CirclePendingLogin | null => {
-  const pending = read<CirclePendingLogin>(PENDING_KEY);
+/** A record made under a different App ID belongs to a different Circle app. */
+const belongsToApp = (record: { appId?: string }, appId?: string) =>
+  !appId || !record.appId || record.appId === appId;
+
+export const savePendingLogin = (
+  scope: CircleSessionScope,
+  pending: Omit<CirclePendingLogin, 'createdAt' | 'appId'>
+) =>
+  write(keyFor(PENDING_KEY, scope.environment), {
+    ...pending,
+    appId: scope.appId,
+    createdAt: Date.now(),
+  });
+
+export const readPendingLogin = (
+  scope: CircleSessionScope
+): CirclePendingLogin | null => {
+  const key = keyFor(PENDING_KEY, scope.environment);
+  const pending = read<CirclePendingLogin>(key);
   if (!pending) return null;
 
-  if (Date.now() - pending.createdAt > PENDING_TTL_MS) {
-    remove(PENDING_KEY);
+  if (
+    Date.now() - pending.createdAt > PENDING_TTL_MS ||
+    !belongsToApp(pending, scope.appId)
+  ) {
+    remove(key);
     return null;
   }
 
   return pending;
 };
 
-export const clearPendingLogin = () => remove(PENDING_KEY);
+export const clearPendingLogin = (scope: CircleSessionScope) =>
+  remove(keyFor(PENDING_KEY, scope.environment));
 
-export const saveSession = (session: Omit<CircleSession, 'createdAt'>) =>
-  write(SESSION_KEY, { ...session, createdAt: Date.now() });
+export const saveSession = (
+  scope: CircleSessionScope,
+  session: Omit<CircleSession, 'createdAt' | 'environment' | 'appId'>
+) =>
+  write(keyFor(SESSION_KEY, scope.environment), {
+    ...session,
+    environment: scope.environment,
+    appId: scope.appId,
+    createdAt: Date.now(),
+  });
 
 /** Merges into the existing session, e.g. to attach a wallet after login. */
-export const updateSession = (patch: Partial<CircleSession>) => {
-  const current = read<CircleSession>(SESSION_KEY);
+export const updateSession = (
+  scope: CircleSessionScope,
+  patch: Partial<Omit<CircleSession, 'environment' | 'appId'>>
+) => {
+  const key = keyFor(SESSION_KEY, scope.environment);
+  const current = read<CircleSession>(key);
   if (!current) return;
-  write(SESSION_KEY, { ...current, ...patch });
+  write(key, { ...current, ...patch });
 };
 
-export const readSession = (): CircleSession | null => {
-  const session = read<CircleSession>(SESSION_KEY);
+export const readSession = (
+  scope: CircleSessionScope
+): CircleSession | null => {
+  const key = keyFor(SESSION_KEY, scope.environment);
+  const session = read<CircleSession>(key);
   if (!session) return null;
 
-  if (isSessionExpired(session)) {
-    remove(SESSION_KEY);
+  if (isSessionExpired(session) || !belongsToApp(session, scope.appId)) {
+    remove(key);
     return null;
   }
 
@@ -132,7 +184,18 @@ export const readSession = (): CircleSession | null => {
 export const isSessionExpired = (session: CircleSession): boolean =>
   Date.now() - session.createdAt > TOKEN_TTL_MS;
 
-export const clearSession = () => {
-  remove(SESSION_KEY);
-  remove(PENDING_KEY);
+/**
+ * Clears one environment's session and pending login. With no environment,
+ * clears both — plus the unscoped keys written by earlier versions.
+ */
+export const clearSession = (environment?: CircleEnvironment) => {
+  const environments = environment ? [environment] : CIRCLE_ENVIRONMENTS;
+  for (const env of environments) {
+    remove(keyFor(SESSION_KEY, env));
+    remove(keyFor(PENDING_KEY, env));
+  }
+  if (!environment) {
+    remove(SESSION_KEY);
+    remove(PENDING_KEY);
+  }
 };

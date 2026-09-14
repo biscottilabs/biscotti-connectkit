@@ -3,8 +3,9 @@ import type {
   EmailLoginResult,
 } from '@circle-fin/w3s-pw-web-sdk/dist/src/types';
 
-import type { CircleBackendAdapter, CircleOptions, CircleWallet } from './types';
-import { toCircleBlockchain } from './chains';
+import type { CircleBackendAdapter, CircleWallet } from './types';
+import { environmentOfBlockchain, toCircleBlockchain } from './chains';
+import type { ResolvedCircleConfig } from './config';
 import { getCircleSdk, loadCircleSdk, executeChallenge } from './sdk';
 import {
   clearPendingLogin,
@@ -13,16 +14,24 @@ import {
   saveSession,
   updateSession,
   type CircleSession,
+  type CircleSessionScope,
 } from './session';
 
 export type CircleLoginContext = {
-  circle: CircleOptions;
+  circle: ResolvedCircleConfig;
   adapter: CircleBackendAdapter;
   chainId: number;
 };
 
-const resolveRedirectUri = (circle: CircleOptions): string =>
-  circle.google?.redirectUri ??
+export const sessionScope = (
+  circle: ResolvedCircleConfig
+): CircleSessionScope => ({
+  environment: circle.environment,
+  appId: circle.appId,
+});
+
+const resolveRedirectUri = (circle: ResolvedCircleConfig): string =>
+  circle.google.redirectUri ??
   (typeof window !== 'undefined' ? window.location.origin : '');
 
 /**
@@ -31,7 +40,7 @@ const resolveRedirectUri = (circle: CircleOptions): string =>
  * from a fresh token.
  */
 const buildConfigs = (
-  circle: CircleOptions,
+  circle: ResolvedCircleConfig,
   deviceToken: string,
   deviceEncryptionKey: string
 ): Configs => ({
@@ -40,9 +49,9 @@ const buildConfigs = (
     deviceToken,
     deviceEncryptionKey,
     google: {
-      clientId: circle.google?.clientId ?? '',
+      clientId: circle.google.clientId ?? '',
       redirectUri: resolveRedirectUri(circle),
-      selectAccountPrompt: circle.google?.selectAccountPrompt ?? true,
+      selectAccountPrompt: circle.google.selectAccountPrompt ?? true,
     },
   },
 });
@@ -53,7 +62,7 @@ const buildConfigs = (
  * declaration does not include the field yet.
  */
 const buildEmailConfigs = (
-  circle: CircleOptions,
+  circle: ResolvedCircleConfig,
   email: string,
   deviceToken: string,
   deviceEncryptionKey: string,
@@ -79,7 +88,7 @@ export const beginGoogleLogin = async ({
   chainId,
 }: CircleLoginContext): Promise<void> => {
   const { SocialLoginProvider } = await loadCircleSdk();
-  const sdk = await getCircleSdk();
+  const sdk = await getCircleSdk(circle.appId ?? '');
 
   const deviceId = await sdk.getDeviceId();
   const { deviceToken, deviceEncryptionKey } = await adapter.createDeviceToken({
@@ -87,7 +96,11 @@ export const beginGoogleLogin = async ({
   });
 
   // Persist before navigating: once `performLogin` fires, this page is gone.
-  savePendingLogin({ deviceToken, deviceEncryptionKey, chainId });
+  savePendingLogin(sessionScope(circle), {
+    deviceToken,
+    deviceEncryptionKey,
+    chainId,
+  });
 
   sdk.updateConfigs(buildConfigs(circle, deviceToken, deviceEncryptionKey));
 
@@ -112,7 +125,7 @@ export const beginEmailLogin = async ({
     );
   }
 
-  const sdk = await getCircleSdk();
+  const sdk = await getCircleSdk(circle.appId ?? '');
   const deviceId = await sdk.getDeviceId();
   const { deviceToken, deviceEncryptionKey, otpToken } =
     await adapter.requestEmailOtp({ deviceId, email });
@@ -156,12 +169,12 @@ export const beginEmailLogin = async ({
       });
     };
 
-    getCircleSdk(configs, onLoginComplete)
+    getCircleSdk(circle.appId ?? '', configs, onLoginComplete)
       .then((configuredSdk) => configuredSdk.verifyOtp())
       .catch(reject);
   });
 
-  saveSession(session);
+  saveSession(sessionScope(circle), session);
   return session;
 };
 
@@ -182,8 +195,8 @@ export const looksLikeOAuthReturn = (): boolean => {
  * Requiring both the SDK callback values and our pending record prevents an
  * unrelated OAuth callback elsewhere in the host app from opening ConnectKit.
  */
-export const shouldResumeGoogleLogin = (): boolean =>
-  readPendingLogin() !== null && looksLikeOAuthReturn();
+export const shouldResumeGoogleLogin = (circle: ResolvedCircleConfig): boolean =>
+  readPendingLogin(sessionScope(circle)) !== null && looksLikeOAuthReturn();
 
 const clearOAuthReturnFromAddressBar = () => {
   if (typeof window === 'undefined') return;
@@ -215,9 +228,10 @@ const LOGIN_CALLBACK_TIMEOUT_MS = 45_000;
  * every mount.
  */
 export const resumeGoogleLogin = async (
-  circle: CircleOptions
+  circle: ResolvedCircleConfig
 ): Promise<CircleSession | null> => {
-  const pending = readPendingLogin();
+  const scope = sessionScope(circle);
+  const pending = readPendingLogin(scope);
   if (!pending || !looksLikeOAuthReturn()) return null;
 
   const configs = buildConfigs(
@@ -228,7 +242,7 @@ export const resumeGoogleLogin = async (
 
   const result = await new Promise<CircleSession>((resolve, reject) => {
     const timer = setTimeout(() => {
-      clearPendingLogin();
+      clearPendingLogin(scope);
       reject(
         new Error(
           'Timed out waiting for Google to complete sign-in. Check that your redirect URI is registered in both Google Cloud and the Circle console.'
@@ -236,9 +250,9 @@ export const resumeGoogleLogin = async (
       );
     }, LOGIN_CALLBACK_TIMEOUT_MS);
 
-    getCircleSdk(configs, (error, loginResult) => {
+    getCircleSdk(circle.appId ?? '', configs, (error, loginResult) => {
       clearTimeout(timer);
-      clearPendingLogin();
+      clearPendingLogin(scope);
       clearOAuthReturnFromAddressBar();
 
       if (error) {
@@ -274,7 +288,7 @@ export const resumeGoogleLogin = async (
     });
   });
 
-  saveSession(result);
+  saveSession(scope, result);
   return result;
 };
 
@@ -297,22 +311,37 @@ export const ensureWallet = async ({
       `Chain ${chainId} is not mapped to a Circle blockchain. Add it via \`circle.chains\`.`
     );
   }
+  if (environmentOfBlockchain(blockchain) !== circle.environment) {
+    throw new Error(
+      `${blockchain} is a ${environmentOfBlockchain(
+        blockchain
+      )} chain, but Circle is configured for ${
+        circle.environment
+      }. Choose a ${circle.environment} chain or change \`circle.environment\`.`
+    );
+  }
 
+  const scope = sessionScope(circle);
   const { userToken, encryptionKey } = session;
-  const sdk = await getCircleSdk();
+  const sdk = await getCircleSdk(circle.appId ?? '');
   sdk.setAuthentication({ userToken, encryptionKey });
 
   const existing = (await adapter.listWallets({ userToken })).find(
     (wallet) => wallet.blockchain === blockchain
   );
   if (existing) {
-    updateSession({ walletId: existing.id, address: existing.address, chainId });
+    updateSession(scope, {
+      walletId: existing.id,
+      address: existing.address,
+      chainId,
+    });
     return existing;
   }
 
   const { challengeId } = await adapter.initializeUser({
     userToken,
     blockchain,
+    accountType: circle.accountType,
   });
 
   await executeChallenge(sdk, challengeId);
@@ -327,6 +356,10 @@ export const ensureWallet = async ({
     );
   }
 
-  updateSession({ walletId: created.id, address: created.address, chainId });
+  updateSession(scope, {
+    walletId: created.id,
+    address: created.address,
+    chainId,
+  });
   return created;
 };

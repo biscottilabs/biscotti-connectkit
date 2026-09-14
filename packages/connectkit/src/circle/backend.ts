@@ -1,3 +1,5 @@
+import type { CircleEnvironment } from './chains';
+import type { ResolvedCircleConfig } from './config';
 import type {
   CircleBackendAdapter,
   CircleChallengeResponse,
@@ -5,11 +7,17 @@ import type {
   CircleEmailOtpResult,
   CircleEndpointConfig,
   CircleHealthReport,
-  CircleOptions,
   CircleWallet,
 } from './types';
 
 export const CIRCLE_DEFAULT_BASE_PATH = '/api/circle';
+
+/**
+ * Tells the backend which Circle environment a request is for, so one server
+ * holding both a testnet and a mainnet key can pick the right one. The server
+ * decides which environments exist; this header only chooses among them.
+ */
+export const CIRCLE_ENVIRONMENT_HEADER = 'X-Circle-Environment';
 
 export class CircleBackendError extends Error {
   readonly status: number;
@@ -40,7 +48,8 @@ export class CircleBackendError extends Error {
  * Circle API key to the client, which would let anyone drain the account.
  */
 export const createHttpBackendAdapter = (
-  config: CircleEndpointConfig = {}
+  config: CircleEndpointConfig = {},
+  environment?: CircleEnvironment
 ): CircleBackendAdapter => {
   const basePath = (config.basePath ?? CIRCLE_DEFAULT_BASE_PATH).replace(
     /\/$/,
@@ -58,6 +67,9 @@ export const createHttpBackendAdapter = (
         method: body === undefined ? 'GET' : 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(environment
+            ? { [CIRCLE_ENVIRONMENT_HEADER]: environment }
+            : {}),
           ...extraHeaders,
         },
         body: body === undefined ? undefined : JSON.stringify(body),
@@ -152,6 +164,7 @@ export const createHttpBackendAdapter = (
 
 /** Resolves the adapter for a given config, preferring an explicit override. */
 export const resolveBackendAdapter = (
-  circle: CircleOptions | undefined
+  circle: ResolvedCircleConfig
 ): CircleBackendAdapter =>
-  circle?.adapter ?? createHttpBackendAdapter(circle?.endpoints);
+  circle.adapter ??
+  createHttpBackendAdapter(circle.endpoints, circle.environment);

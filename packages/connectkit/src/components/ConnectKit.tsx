@@ -31,6 +31,7 @@ import { useChainIsSupported } from '../hooks/useChainIsSupported';
 import type { CircleOptions } from '../circle';
 import { isCircleEnabled } from '../circle/types';
 import { shouldResumeGoogleLogin } from '../circle/login';
+import { resolveCircleConfig } from '../circle/config';
 import { CIRCLE_CONNECTOR_ID } from '../circle/connector';
 
 export const routes = {
@@ -214,7 +215,12 @@ export const ConnectKitProvider = ({
   // continuation page immediately so it can finish provisioning and connect
   // wagmi without asking the user to click "Connect Wallet" a second time.
   useEffect(() => {
-    if (!isCircleEnabled(circleOptions) || !shouldResumeGoogleLogin()) return;
+    if (!isCircleEnabled(circleOptions)) return;
+    const circle = resolveCircleConfig(
+      circleOptions!,
+      wagmiConfig.chains.map((chain) => chain.id)
+    );
+    if (!shouldResumeGoogleLogin(circle)) return;
     setRoute(routes.CIRCLE);
     setOpen(true);
   }, []);

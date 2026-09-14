@@ -15,29 +15,44 @@ const externalDeps = [
 const external = (id) =>
   externalDeps.some((dep) => id === dep || id.startsWith(`${dep}/`));
 
+const plugins = () => [
+  peerDepsExternal(),
+  typescript({
+    useTsconfigDeclarationDir: true,
+    include: ['**/*.ts', '**/*.tsx'],
+    exclude: 'node_modules/**',
+    transformers: [
+      () => ({
+        before: [styledComponentsTransformer],
+      }),
+    ],
+  }),
+];
+
 export default [
   {
     input: ['./src/index.ts'],
     external,
     output: [
       {
-        file: packageJson.exports.import,
+        file: packageJson.exports['.'].import,
         format: 'esm',
         sourcemap: false,
       },
     ],
-    plugins: [
-      peerDepsExternal(),
-      typescript({
-        useTsconfigDeclarationDir: true,
-        include: ['**/*.ts', '**/*.tsx'],
-        exclude: 'node_modules/**',
-        transformers: [
-          () => ({
-            before: [styledComponentsTransformer],
-          }),
-        ],
-      }),
+    plugins: plugins(),
+  },
+  // Server-only entry; see rollup.config.prod.js.
+  {
+    input: ['./src/server/index.ts'],
+    external,
+    output: [
+      {
+        file: packageJson.exports['./server'].import,
+        format: 'esm',
+        sourcemap: false,
+      },
     ],
+    plugins: plugins(),
   },
 ];
