@@ -1,3 +1,29 @@
+# Unreleased
+
+## Added
+
+- Circle testnet and mainnet environments. Declare both under `circle.environments`
+  and pick one with `circle.environment`. Sessions are stored per environment and App ID.
+- `@biscottidex/connectkit/server`: `createCircleHandler`, `createCircleNodeMiddleware`
+  and `readCircleServerEnv`. One handler serves both environments, selected by the
+  `X-Circle-Environment` header, and rejects keys or chains from the wrong environment.
+  Includes an `authorize` hook.
+- `circle.accountType` (`EOA` or `SCA`), `useCircleConfig`, `useCircleLogin().environment`,
+  and Monad (`MONAD`, `MONAD-TESTNET`) chain mappings.
+- Preflight errors for an invalid or ambiguous environment, a default chain from the
+  other environment, and a default chain missing from the wagmi `chains`.
+
+## Breaking
+
+- `preflightCircleConfig(circle, appChainIds)` takes the app's chain ids instead of a
+  single chain id.
+- `readCircleSession` takes a `{ environment, appId }` scope. `clearCircleSession()`
+  with no argument clears both environments.
+
+## Fixed
+
+- Circle challenges run after a page refresh now set the App ID on the SDK first.
+
 # 0.0.1
 
 This is the first release under the Biscotti Finance name. The package is a fork of

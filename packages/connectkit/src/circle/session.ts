@@ -1,49 +1,27 @@
 import { CIRCLE_ENVIRONMENTS, type CircleEnvironment } from './chains';
 
 /**
- * Session persistence for the Circle integration.
+ * Records are keyed by environment: a testnet token is useless to a mainnet
+ * key, but switching back should not lose it. Each also stores its App ID and
+ * is dropped if that changes.
  *
- * Two distinct records live here:
- *
- *  - `pending`: written immediately *before* the Google OAuth redirect. Google
- *    navigates the whole page away, so every scrap of in-memory state is lost.
- *    Without this the SDK cannot process the OAuth response when the user
- *    returns, because the device token it was configured with is gone.
- *  - `session`: the authenticated result, kept so a page refresh does not force
- *    the user back through Google while their token is still valid.
- *
- * Both are keyed by Circle environment. A testnet user token is meaningless to
- * a mainnet API key (and vice versa), so an app that changes environment must
- * not pick up the other environment's session — but it should not destroy it
- * either, since switching back is common during development. Each record also
- * remembers the App ID it was created under and is discarded if that changes.
- *
- * Storage is `sessionStorage`, not `localStorage`: the user token is a bearer
- * credential and should not outlive the browser tab. Note that any storage
- * readable by JavaScript is readable by injected script, so a site with an XSS
- * hole leaks this token — Circle's token expiry is what bounds the damage.
+ * `sessionStorage` because the user token is a bearer credential.
  */
 
 const SESSION_KEY = 'ck-circle-session';
 const PENDING_KEY = 'ck-circle-pending';
 
-/**
- * Circle social/email user tokens expire after 14 days. Expire five minutes
- * early to avoid handing a token to a challenge at the end of its lifetime.
- * The refresh token is retained in the session so applications can add Circle's
- * refresh endpoint without changing the stored shape.
- */
+// Circle user tokens last 14 days; expire five minutes early.
 const TOKEN_TTL_MS = 14 * 24 * 60 * 60 * 1000 - 5 * 60 * 1000;
 
-/** OAuth round trips are fast; anything older is a stale tab, not a redirect. */
 const PENDING_TTL_MS = 10 * 60 * 1000;
 
-/** Identifies which Circle app and environment a record belongs to. */
 export type CircleSessionScope = {
   environment: CircleEnvironment;
   appId?: string;
 };
 
+/** Saved before the Google redirect, which discards all in-memory state. */
 export type CirclePendingLogin = {
   deviceToken: string;
   deviceEncryptionKey: string;
@@ -70,7 +48,6 @@ const storage = (): Storage | null => {
   try {
     return window.sessionStorage;
   } catch {
-    // Private browsing modes and sandboxed iframes can throw on access.
     return null;
   }
 };
@@ -92,7 +69,7 @@ const write = (key: string, value: unknown) => {
   try {
     store.setItem(key, JSON.stringify(value));
   } catch {
-    /* quota or disabled storage — the flow still works, just without resume */
+    /* storage full or disabled */
   }
 };
 
@@ -102,14 +79,13 @@ const remove = (key: string) => {
   try {
     store.removeItem(key);
   } catch {
-    /* nothing useful to do */
+    /* storage disabled */
   }
 };
 
 const keyFor = (base: string, environment: CircleEnvironment) =>
   `${base}:${environment}`;
 
-/** A record made under a different App ID belongs to a different Circle app. */
 const belongsToApp = (record: { appId?: string }, appId?: string) =>
   !appId || !record.appId || record.appId === appId;
 
@@ -155,7 +131,6 @@ export const saveSession = (
     createdAt: Date.now(),
   });
 
-/** Merges into the existing session, e.g. to attach a wallet after login. */
 export const updateSession = (
   scope: CircleSessionScope,
   patch: Partial<Omit<CircleSession, 'environment' | 'appId'>>
@@ -184,10 +159,7 @@ export const readSession = (
 export const isSessionExpired = (session: CircleSession): boolean =>
   Date.now() - session.createdAt > TOKEN_TTL_MS;
 
-/**
- * Clears one environment's session and pending login. With no environment,
- * clears both — plus the unscoped keys written by earlier versions.
- */
+/** Without an environment, clears both plus the unscoped legacy keys. */
 export const clearSession = (environment?: CircleEnvironment) => {
   const environments = environment ? [environment] : CIRCLE_ENVIRONMENTS;
   for (const env of environments) {

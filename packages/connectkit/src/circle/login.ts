@@ -79,7 +79,7 @@ const buildEmailConfigs = (
   } as Configs);
 
 /**
- * Starts Google sign-in. This navigates the browser away and does not return —
+ * Starts Google sign-in. This navigates the browser away and does not return;
  * control resumes in {@link resumeGoogleLogin} after Google redirects back.
  */
 export const beginGoogleLogin = async ({
@@ -180,7 +180,7 @@ export const beginEmailLogin = async ({
 
 /**
  * True when the current URL carries an OAuth response. Used to avoid waiting on
- * a login callback that is never going to fire — for instance when a stale
+ * a login callback that is never going to fire, for instance when a stale
  * pending record survives an abandoned sign-in.
  */
 export const looksLikeOAuthReturn = (): boolean => {

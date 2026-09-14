@@ -18,7 +18,7 @@ export type CircleChallengeResult =
 /**
  * The Circle SDK is loaded on demand rather than imported at module scope.
  *
- * Two reasons. It is browser-only — it drives a hosted iframe and touches
+ * Two reasons. It is browser-only: it drives a hosted iframe and touches
  * `window` in its constructor, so importing it eagerly breaks SSR. And it pulls
  * in `firebase` transitively (Circle uses it for Apple login), which is far too
  * much weight to put in the bundle of every app that merely imports ConnectKit.
@@ -65,7 +65,7 @@ export const loadCircleSdk = (): Promise<CircleSdkModule> => {
         ChallengeType: types.ChallengeType as unknown as Record<string, string>,
       }))
       .catch((error) => {
-        // Reset so a later attempt can retry — a failed chunk fetch should not
+        // Reset so a later attempt can retry; a failed chunk fetch should not
         // permanently poison the integration.
         modulePromise = null;
         const originalMessage =
@@ -88,12 +88,8 @@ export const loadCircleSdk = (): Promise<CircleSdkModule> => {
 let instance: W3SSdk | null = null;
 
 /**
- * One SDK instance per page. The SDK owns a hosted iframe and is a singleton
- * internally, so constructing it again returns the same object.
- *
- * `appId` is required on every call, not just the first. The App ID differs
- * between Circle environments, and a challenge executed after a page refresh
- * would otherwise reach an instance that was never told which app it serves.
+ * `appId` is set on every call: after a refresh, a challenge could otherwise
+ * run on an instance that never received it.
  */
 export const getCircleSdk = async (
   appId: string,
@@ -125,7 +121,7 @@ export type CircleLoginResult = SocialLoginResult | EmailLoginResult;
  *
  * A challenge is how Circle gates sensitive actions behind its hosted
  * confirmation UI. The user authenticates or approves as required by their
- * configured method, and the result — a signature or transaction hash — arrives
+ * configured method, and the result (a signature or transaction hash) arrives
  * here. Anything other than COMPLETE is a failure, including PENDING.
  */
 export const executeChallenge = async (
@@ -174,7 +170,7 @@ type MaybeSigned = {
  * Pulls the signature out of a completed challenge.
  *
  * Circle returns it inline on the challenge result, so a signature never needs
- * polling — but the field is optional on the shared result type, hence the
+ * polling, but the field is optional on the shared result type, hence the
  * explicit check rather than a cast.
  */
 export const extractSignature = (result: CircleChallengeResult): string => {

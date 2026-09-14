@@ -93,8 +93,6 @@ export const useCircleLogin = (): UseCircleLoginResult => {
   const options = useCircleOptions();
   const circle = useCircleConfig();
   const enabled = isCircleEnabled(options);
-  // The same default the connector falls back to, so the wallet provisioned
-  // here is the one the connector reports once wagmi connects.
   const chainId = circle?.defaultChainId ?? chains[0].id;
 
   const [status, setStatus] = useState<CircleLoginStatus>(
@@ -174,7 +172,6 @@ export const useCircleLogin = (): UseCircleLoginResult => {
 
     let cancelled = false;
 
-    // Nothing from a previous environment may survive into this one.
     setSession(null);
     setWallet(null);
     setError(null);
@@ -214,13 +211,9 @@ export const useCircleLogin = (): UseCircleLoginResult => {
         return;
       }
 
-      // Sessions are stored per environment and App ID, so this can only ever
-      // return a session that the configured API key is able to use.
       const stored = readSession(sessionScope(circle!));
       if (stored) {
-        // Within one environment a session stays valid across chains, but its
-        // wallet is tied to one chain. If the app no longer lists that chain,
-        // the wallet cannot be represented, so start over.
+        // The stored wallet's chain was removed from the app.
         if (
           stored.chainId !== undefined &&
           !chains.some((chain) => chain.id === stored.chainId)
@@ -253,11 +246,8 @@ export const useCircleLogin = (): UseCircleLoginResult => {
     return () => {
       cancelled = true;
     };
-    // Intentionally keyed on identity rather than on every option. React Strict
-    // Mode runs this effect twice in development; the first pass is cancelled
-    // before it can consume the one-shot OAuth record, and the second pass
-    // completes initialization. A change of environment or App ID is a
-    // different Circle app, so it re-runs against that app's stored session.
+    // Keyed narrowly: Strict Mode's cancelled first pass must not consume the
+    // one-shot OAuth record. Environment or App ID changes mean a different app.
   }, [enabled, circle?.environment, circle?.appId]);
 
   const signInWithGoogle = useCallback(async () => {

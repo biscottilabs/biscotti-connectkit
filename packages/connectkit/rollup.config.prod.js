@@ -3,7 +3,7 @@ import typescript from 'rollup-plugin-typescript2';
 
 import packageJson from './package.json';
 
-// Everything declared as a runtime or peer dependency stays external — a library
+// Everything declared as a runtime or peer dependency stays external: a library
 // must not bundle its own dependencies, or consumers end up with duplicate copies
 // (two styled-components instances, two wagmi connector identities, and so on).
 // Derived from package.json so a newly added dependency cannot be silently

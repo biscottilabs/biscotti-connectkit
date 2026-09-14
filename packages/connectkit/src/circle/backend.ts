@@ -12,11 +12,7 @@ import type {
 
 export const CIRCLE_DEFAULT_BASE_PATH = '/api/circle';
 
-/**
- * Tells the backend which Circle environment a request is for, so one server
- * holding both a testnet and a mainnet key can pick the right one. The server
- * decides which environments exist; this header only chooses among them.
- */
+/** Lets one server holding both keys pick the right one per request. */
 export const CIRCLE_ENVIRONMENT_HEADER = 'X-Circle-Environment';
 
 export class CircleBackendError extends Error {
@@ -76,7 +72,7 @@ export const createHttpBackendAdapter = (
       });
     } catch (_error) {
       // A network-level failure usually means the route simply does not exist
-      // yet, which is the single most common setup mistake — say so plainly.
+      // yet, which is the single most common setup mistake, so say so plainly.
       throw new CircleBackendError(
         route,
         0,

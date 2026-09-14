@@ -1,14 +1,6 @@
 /**
- * Circle identifies chains by its own string enum rather than by EIP-155 chain
- * id, so every call that crosses the Circle API boundary needs a translation in
- * one direction or the other:
- *
- *  - outbound: wagmi gives us a numeric `chainId`, Circle wants `"ARC-TESTNET"`
- *  - inbound:  `listWallets` returns `"ARC-TESTNET"`, wagmi wants `5042002`
- *
- * Only EVM chains are mapped. Circle also supports Solana, NEAR and Aptos, but
- * those cannot back an EIP-1193 provider and are therefore out of scope for the
- * connector.
+ * Circle names chains with its own identifiers (`BASE`, `ARC-TESTNET`), not
+ * EIP-155 ids. Only EVM chains are mapped, since the connector is EIP-1193.
  */
 export type CircleBlockchain =
   | 'ETH'
@@ -28,19 +20,13 @@ export type CircleBlockchain =
   | 'MONAD'
   | 'MONAD-TESTNET'
   | 'ARC-TESTNET'
-  /**
-   * Circle's generic buckets for other EVM chains. Circle only creates wallets
-   * and signs on these — it does not broadcast — so `sendTransaction` will not
-   * work. Map them via `circle.chains` only if signing is all you need.
-   */
+  /** Other EVM chains. Circle signs but does not broadcast, so no transactions. */
   | 'EVM'
   | 'EVM-TESTNET';
 
 /**
- * Circle runs two fully separate environments. The API key decides which one a
- * request reaches: `TEST_API_KEY:` keys only work against testnets and
- * `LIVE_API_KEY:` keys only against mainnets. Users, tokens and wallets never
- * cross between them.
+ * Circle's two separate environments. The API key selects one: `TEST_API_KEY:`
+ * works only on testnets, `LIVE_API_KEY:` only on mainnets.
  */
 export type CircleEnvironment = 'testnet' | 'mainnet';
 
@@ -53,12 +39,7 @@ export const isCircleEnvironment = (
   value: unknown
 ): value is CircleEnvironment => value === 'testnet' || value === 'mainnet';
 
-/**
- * Chains whose Circle identifier and EIP-155 id we have both verified. The
- * generic `EVM` / `EVM-TESTNET` buckets are deliberately absent rather than
- * guessed at, because a wrong chain id here routes a signature request at the
- * wrong network. Use `circle.chains` in ConnectKitOptions to add them.
- */
+/** Verified pairs only. A wrong id would send signatures to the wrong network. */
 export const circleChainsByChainId: Record<number, CircleBlockchain> = {
   1: 'ETH',
   11155111: 'ETH-SEPOLIA',
@@ -81,12 +62,7 @@ export const circleChainsByChainId: Record<number, CircleBlockchain> = {
 
 export type CircleChainMap = Record<number, CircleBlockchain>;
 
-/**
- * Every Circle testnet identifier carries a network suffix, and no mainnet
- * identifier does, so the environment can be derived from the name alone. That
- * keeps app-supplied `circle.chains` entries environment-aware without asking
- * developers to label them.
- */
+// Every Circle testnet identifier has one of these suffixes; no mainnet one does.
 const TESTNET_SUFFIX = /-(TESTNET|SEPOLIA|AMOY|FUJI|DEVNET)$/;
 
 export const environmentOfBlockchain = (
@@ -94,21 +70,12 @@ export const environmentOfBlockchain = (
 ): CircleEnvironment =>
   TESTNET_SUFFIX.test(blockchain) ? 'testnet' : 'mainnet';
 
-/**
- * Resolves the Circle identifier for a chain id, honouring any app-supplied
- * overrides/additions first so a consumer can support a chain we do not ship.
- */
 export const toCircleBlockchain = (
   chainId: number,
   overrides?: CircleChainMap
 ): CircleBlockchain | undefined =>
   overrides?.[chainId] ?? circleChainsByChainId[chainId];
 
-/**
- * Inverse of {@link toCircleBlockchain}. Returns `undefined` for chains we do
- * not map — including the non-EVM ones — so callers can skip wallets the
- * connector cannot represent instead of surfacing a bogus chain id.
- */
 export const toChainId = (
   blockchain: string,
   overrides?: CircleChainMap
@@ -125,7 +92,6 @@ export const isCircleSupportedChain = (
   overrides?: CircleChainMap
 ): boolean => toCircleBlockchain(chainId, overrides) !== undefined;
 
-/** `undefined` when Circle has no mapping for the chain at all. */
 export const environmentOfChain = (
   chainId: number,
   overrides?: CircleChainMap

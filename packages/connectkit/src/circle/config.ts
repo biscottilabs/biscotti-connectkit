@@ -14,26 +14,16 @@ import type {
   CircleOptions,
 } from './types';
 
-/** How the active environment was decided. Reported in diagnostics. */
 export type CircleEnvironmentSource =
-  /** `circle.environment` was set. */
   | 'explicit'
-  /** `circle.environments` declares exactly one environment. */
   | 'environments'
-  /** Derived from `defaultChainId` or the app's chains. */
   | 'chain'
-  /** Nothing to go on; Circle's own guidance is to start on testnet. */
   | 'default';
 
-/**
- * The settings for exactly one environment, with per-environment values
- * already layered over the shared ones. Everything below `CircleOptions` reads
- * this instead of the raw options, so precedence is decided in one place.
- */
+/** One environment's settings, with per-environment values applied. */
 export type ResolvedCircleConfig = {
   environment: CircleEnvironment;
   environmentSource: CircleEnvironmentSource;
-  /** True when `circle.environments` is used; diagnostics name per-env vars. */
   usesEnvironments: boolean;
   appId?: string;
   google: CircleGoogleOptions;
@@ -75,16 +65,14 @@ const resolveEnvironment = (
     if (fromChain) return { environment: fromChain, source: 'chain' };
   }
 
+  // Circle recommends starting on testnet.
   return { environment: 'testnet', source: 'default' };
 };
 
 /**
- * Picks the active environment and flattens its settings.
- *
- * `appChainIds` are the wagmi config's chains, in order. They are used to infer
- * the environment when nothing else decides it, and to choose a default chain
- * that actually belongs to that environment — so an app listing both Base and
- * Base Sepolia provisions on Base Sepolia when running against testnet.
+ * `appChainIds` are the wagmi chains in order. The default chain is the first
+ * one in the active environment, so an app listing Base and Base Sepolia
+ * provisions on Base Sepolia when running on testnet.
  */
 export const resolveCircleConfig = (
   circle: CircleOptions,

@@ -1,9 +1,6 @@
 import type { CircleHandler } from './handler';
 
-/**
- * Structural stand-ins for Node's `IncomingMessage` / `ServerResponse`, so this
- * entry point does not force `@types/node` on consumers that never use it.
- */
+// Structural types so consumers do not need `@types/node`.
 type NodeRequest = AsyncIterable<Uint8Array | string> & {
   url?: string;
   method?: string;
@@ -17,17 +14,11 @@ type NodeResponse = {
 };
 
 export type CircleNodeMiddlewareOptions = {
-  /** Only requests under this prefix are handled. Defaults to `/api/circle`. */
+  /** Defaults to `/api/circle`. */
   basePath?: string;
 };
 
-/**
- * Adapts the web-standard handler to Connect-style middleware, for Express,
- * Vite's dev server, or a plain `http.createServer`.
- *
- * Requests outside `basePath` are passed to `next` untouched (or answered 404
- * when there is no `next`).
- */
+/** Connect-style middleware for Express, Vite or `http.createServer`. */
 export const createCircleNodeMiddleware = (
   handler: CircleHandler,
   { basePath = '/api/circle' }: CircleNodeMiddlewareOptions = {}

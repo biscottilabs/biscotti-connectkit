@@ -7,7 +7,7 @@ const styledComponentsTransformer = createStyledComponentsTransformer({
   displayName: true,
 });
 
-// Kept in sync with rollup.config.prod.js — see the comment there.
+// Kept in sync with rollup.config.prod.js; see the comment there.
 const externalDeps = [
   ...Object.keys(packageJson.dependencies ?? {}),
   ...Object.keys(packageJson.peerDependencies ?? {}),

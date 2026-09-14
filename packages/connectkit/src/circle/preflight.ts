@@ -21,10 +21,6 @@ const DOCS = {
   chains: 'https://developers.circle.com/wallets/supported-blockchains',
 };
 
-/**
- * Conventional env var names. Apps using `circle.environments` keep one set of
- * values per environment, so the name says which one is missing.
- */
 const clientEnvVar = (circle: ResolvedCircleConfig, name: string) =>
   circle.usesEnvironments
     ? `NEXT_PUBLIC_CIRCLE_${circle.environment.toUpperCase()}_${name}`
@@ -36,15 +32,8 @@ const serverKeyEnvVar = (environment?: CircleEnvironment) =>
     : 'CIRCLE_API_KEY';
 
 /**
- * Synchronous, client-side configuration check.
- *
- * Deliberately returns *every* problem rather than throwing on the first one:
- * a developer setting this up for the first time is usually missing several
- * values at once, and discovering them one redeploy at a time is miserable.
- *
- * `appChainIds` are the wagmi config's chains. Server-side values (the Circle
- * API keys) cannot be seen from here — those come from {@link issuesFromHealth}
- * via the backend's health route.
+ * Returns every client-side problem at once. Server values come from
+ * {@link issuesFromHealth}.
  */
 export const preflightCircleConfig = (
   options: CircleOptions | undefined,
@@ -197,13 +186,7 @@ export const preflightCircleConfig = (
   return issues;
 };
 
-/**
- * Translates a backend health report into the same issue shape.
- *
- * Servers that support both environments report each one separately; only the
- * active environment's entry matters to this app. Older servers report a single
- * top-level status, which is used as is.
- */
+/** Uses the active environment's entry when the server reports per environment. */
 export const issuesFromHealth = (
   report: CircleHealthReport | undefined,
   environment?: CircleEnvironment
@@ -241,7 +224,7 @@ export const issuesFromHealth = (
     severity: 'error' as const,
     message: `${
       item.envVar ?? item.id
-    } is not set on the server. Add it to your server environment — never to a client-visible variable.`,
+    } is not set on the server. Add it to your server environment, never to a client-visible variable.`,
     docsUrl: DOCS.apiKey,
   }));
 
@@ -264,11 +247,7 @@ export const issuesFromHealth = (
 export const hasBlockingIssues = (issues: CircleConfigIssue[]): boolean =>
   issues.some((issue) => issue.severity === 'error');
 
-/**
- * Whether to show developers the itemised diagnostic or end users the generic
- * message. Errs toward the generic message: a bundler that strips `NODE_ENV`
- * should not accidentally leak configuration detail to real users.
- */
+/** Defaults to hiding diagnostics when `NODE_ENV` is unknown. */
 export const shouldShowDiagnostics = (debugMode?: boolean): boolean => {
   if (debugMode) return true;
   try {

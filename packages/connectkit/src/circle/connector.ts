@@ -36,7 +36,7 @@ export type CircleConnectorParameters = {
  *
  * The connector is a thin adapter over the session that the login flow writes:
  * it does not own authentication. That split matters because Google sign-in
- * navigates the entire page away, which no `connect()` promise can survive — so
+ * navigates the entire page away, which no `connect()` promise can survive, so
  * `connect()` either finds an existing session and returns immediately, or
  * kicks off the redirect and lets the app reconnect on the way back.
  */
@@ -239,8 +239,7 @@ export const circleConnector = ({ circle }: CircleConnectorParameters) =>
           );
         }
 
-        // A Circle user exists in exactly one environment, so a chain from the
-        // other environment is unreachable with this session and API key.
+        // The session and API key cannot reach the other environment.
         if (environmentOfBlockchain(blockchain) !== resolved.environment) {
           throw new Error(
             `${chain.name} is a ${environmentOfBlockchain(
@@ -252,7 +251,7 @@ export const circleConnector = ({ circle }: CircleConnectorParameters) =>
         }
 
         // A Circle wallet belongs to exactly one blockchain, so switching chains
-        // means switching wallets — not re-pointing the existing one.
+        // means switching wallets, not re-pointing the existing one.
         const target = (
           await adapter.listWallets({ userToken: session.userToken })
         ).find((wallet) => wallet.blockchain === blockchain);

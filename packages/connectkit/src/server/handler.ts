@@ -1,19 +1,4 @@
-/**
- * Server half of Sign in with Circle.
- *
- * Circle's REST API needs a secret API key, so the browser never calls it
- * directly. ConnectKit calls these routes on the app's own server instead, and
- * this handler forwards them to Circle with the key for the environment the
- * request asks for.
- *
- * It is built on the web-standard `Request` / `Response`, so the same handler
- * runs in Next.js route handlers, Bun, Deno, Cloudflare Workers and Hono as is,
- * and in Node servers (Express, Vite, plain `http`) via
- * `createCircleNodeMiddleware`.
- *
- * Nothing here may import React or browser code: this file is bundled into the
- * separate `@biscottidex/connectkit/server` entry point.
- */
+// Bundled into `@biscottidex/connectkit/server`: no React or browser imports.
 import {
   CIRCLE_ENVIRONMENTS,
   environmentOfBlockchain,
@@ -33,7 +18,7 @@ const DOCS_KEYS = 'https://developers.circle.com/api-reference/keys';
 export type CircleServerEnvironment = {
   /** `TEST_API_KEY:…` for testnet, `LIVE_API_KEY:…` for mainnet. */
   apiKey?: string;
-  /** Env var the key is read from, named in diagnostics. */
+  /** Named in diagnostics. */
   envVar?: string;
 };
 
@@ -51,44 +36,31 @@ export type CircleAuthorizeContext = {
   request: Request;
   route: CircleRoute;
   environment: CircleEnvironment;
-  /** Parsed JSON body; empty for `GET /health`. */
   body: Record<string, unknown>;
-  /** The Circle user token the browser sent, for routes that act as a user. */
   userToken?: string;
 };
 
 export type CircleHandlerOptions = {
-  /**
-   * The environments this server can serve. The server is the authority here:
-   * a browser can only choose among environments that have a key, so a preview
-   * deployment without a live key can never be pointed at mainnet.
-   */
+  /** Browsers can only select environments that have a key here. */
   environments: Partial<Record<CircleEnvironment, CircleServerEnvironment>>;
 
   /**
-   * Used when a request carries no `X-Circle-Environment` header (clients that
-   * predate environments). Defaults to the only configured environment, if
-   * exactly one has a key.
+   * For requests without `X-Circle-Environment`. Defaults to the only
+   * environment with a key.
    */
   defaultEnvironment?: CircleEnvironment;
 
   /**
-   * Runs before every route except `health`. Throw a `CircleHttpError` (for
-   * example 401) to reject the request.
-   *
-   * Use this to tie Circle calls to your own session: the user token comes from
-   * the browser, so on its own it proves only that the caller holds a token,
-   * not that your app authorised them to use it.
+   * Runs before every route except `health`; throw `CircleHttpError` to reject.
+   * Use it to tie the browser-supplied user token to your own session.
    */
   authorize?: (context: CircleAuthorizeContext) => void | Promise<void>;
 
-  /** Called with unexpected errors. Defaults to `console.error`. */
   onError?: (error: unknown) => void;
 
-  /** Defaults to Circle's production API. Both environments share it. */
+  /** Both environments share this URL; the key selects the environment. */
   apiBaseUrl?: string;
 
-  /** Defaults to the global `fetch`. */
   fetch?: typeof fetch;
 };
 
@@ -110,7 +82,6 @@ export class CircleHttpError extends Error {
   }
 }
 
-/** The environment a Circle API key belongs to, read from its prefix. */
 export const apiKeyEnvironment = (
   apiKey: string | undefined
 ): CircleEnvironment | undefined =>
@@ -123,10 +94,7 @@ export const apiKeyEnvironment = (
 const defaultEnvVar = (environment: CircleEnvironment) =>
   `CIRCLE_${environment.toUpperCase()}_API_KEY`;
 
-/**
- * Checks one environment's key without ever including the key in the result,
- * so the output is safe to return from the public health route.
- */
+// The result goes to the public health route, so it must never contain the key.
 const checkEnvironment = (
   environment: CircleEnvironment,
   config: CircleServerEnvironment
@@ -170,7 +138,6 @@ const randomId = (): string => {
   const webCrypto = globalThis.crypto;
   if (webCrypto?.randomUUID) return webCrypto.randomUUID();
 
-  // Idempotency keys and request ids need uniqueness, not secrecy.
   const bytes = new Uint8Array(16);
   if (webCrypto?.getRandomValues) webCrypto.getRandomValues(bytes);
   else for (let i = 0; i < 16; i++) bytes[i] = Math.floor(Math.random() * 256);
@@ -187,7 +154,6 @@ const json = (status: number, value: unknown): Response =>
     status,
     headers: {
       'Content-Type': 'application/json',
-      // Every response is per-user or per-deployment; never cache it.
       'Cache-Control': 'no-store',
     },
   });
@@ -227,7 +193,6 @@ const optionalEnum = <T extends string>(
   return value as T;
 };
 
-/** Rejects a blockchain from the other environment before Circle does. */
 const requireBlockchainIn = (
   blockchain: string,
   environment: CircleEnvironment
@@ -254,7 +219,6 @@ const ROUTES: readonly CircleRoute[] = [
   'health',
 ];
 
-/** Routes that authenticate the end user rather than start a login. */
 const USER_ROUTES: readonly CircleRoute[] = [
   'initialize-user',
   'wallets',
@@ -265,13 +229,7 @@ const USER_ROUTES: readonly CircleRoute[] = [
 
 export const CIRCLE_ENVIRONMENT_REQUEST_HEADER = 'x-circle-environment';
 
-/**
- * Creates the request handler for every Circle route.
- *
- * Routing uses the last path segment (`…/device-token`, `…/health`), so the
- * handler works wherever it is mounted — `/api/circle/[...route]` in Next.js,
- * or any prefix passed to `endpoints.basePath` on the client.
- */
+/** Routes on the last path segment, so it works under any mount path. */
 export const createCircleHandler = (options: CircleHandlerOptions) => {
   const apiBaseUrl = (options.apiBaseUrl ?? CIRCLE_API_BASE_URL).replace(
     /\/$/,
@@ -283,7 +241,6 @@ export const createCircleHandler = (options: CircleHandlerOptions) => {
     ((error: unknown) =>
       console.error('[circle] unexpected route failure', error));
 
-  // Checked once: keys do not change while the process runs.
   const health: Partial<Record<CircleEnvironment, CircleEnvironmentHealth>> =
     {};
   for (const environment of CIRCLE_ENVIRONMENTS) {
@@ -302,7 +259,7 @@ export const createCircleHandler = (options: CircleHandlerOptions) => {
       ? health[fallbackEnvironment]
       : undefined;
     return {
-      // Top-level fields keep clients that predate environments working.
+      // Top-level fields serve clients that predate environments.
       ...(primary ?? {
         ok: Object.values(health).some((entry) => entry?.ok),
       }),
@@ -375,9 +332,7 @@ export const createCircleHandler = (options: CircleHandlerOptions) => {
         'X-Request-Id': requestId,
         ...(init.userToken ? { 'X-User-Token': init.userToken } : {}),
       },
-      // No `cache` option: older Node fetch implementations reject it, and
-      // these calls only ever run inside POST handlers, which frameworks such
-      // as Next.js never cache.
+      // No `cache` option: older Node fetch rejects it.
       body: init.body ? JSON.stringify(init.body) : undefined,
     });
 
@@ -396,8 +351,6 @@ export const createCircleHandler = (options: CircleHandlerOptions) => {
     }
 
     if (!response.ok) {
-      // Circle's own message and code are far more actionable than a status,
-      // and never contain request headers, so they are safe to pass on.
       throw new CircleHttpError(
         response.status,
         typeof parsed.message === 'string'
@@ -413,7 +366,6 @@ export const createCircleHandler = (options: CircleHandlerOptions) => {
       );
     }
 
-    // Circle wraps every successful payload in a `data` envelope.
     return parsed.data as T;
   };
 
@@ -458,8 +410,6 @@ export const createCircleHandler = (options: CircleHandlerOptions) => {
       };
     },
 
-    // Returns a challenge, not a wallet: the wallet exists only once the user
-    // approves the challenge in Circle's hosted UI.
     'initialize-user': async (environment, body) => {
       const blockchain = requireString(body, 'blockchain');
       requireBlockchainIn(blockchain, environment);
@@ -482,8 +432,7 @@ export const createCircleHandler = (options: CircleHandlerOptions) => {
       return { challengeId: data.challengeId };
     },
 
-    // POST, not GET: the user token must not appear in a query string, where
-    // it would leak into logs, history and referrer headers.
+    // POST so the user token never lands in a query string.
     wallets: async (environment, body) => {
       const blockchain = optionalString(body, 'blockchain');
       if (blockchain) requireBlockchainIn(blockchain, environment);
@@ -537,8 +486,6 @@ export const createCircleHandler = (options: CircleHandlerOptions) => {
       return { challengeId: data.challengeId };
     },
 
-    // Circle models any EVM call as a contract execution with gas chosen by fee
-    // level, which is why the connector translates wagmi's transaction first.
     transaction: async (environment, body) => {
       const data = await callCircle<{ challengeId: string }>(
         environment,
@@ -575,7 +522,6 @@ export const createCircleHandler = (options: CircleHandlerOptions) => {
       const route = ROUTES.find((candidate) => candidate === segment);
       if (!route) throw new CircleHttpError(404, 'Unknown Circle route.');
 
-      // Reports presence only, never values, so it is safe to leave public.
       if (route === 'health') {
         if (request.method !== 'GET') {
           throw new CircleHttpError(405, 'Method not allowed.');
@@ -621,8 +567,7 @@ export const createCircleHandler = (options: CircleHandlerOptions) => {
         });
       }
 
-      // Never forward an unknown error's detail: it may contain server
-      // internals. Log it instead.
+      // Unknown errors may contain server internals; log, do not forward.
       onError(error);
       return json(500, {
         message: 'Unexpected Circle proxy error. Check the server logs.',
