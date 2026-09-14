@@ -16,6 +16,7 @@ import { resolveCircleConfig, type ResolvedCircleConfig } from './config';
 const DOCS = {
   appId: 'https://console.circle.com/',
   google: 'https://developers.circle.com/wallets/user-controlled/social-logins',
+  apple: 'https://firebase.google.com/docs/auth/web/apple',
   apiKey: 'https://developers.circle.com/wallets/user-controlled/build-a-wallet-app',
   keys: 'https://developers.circle.com/api-reference/keys',
   chains: 'https://developers.circle.com/wallets/supported-blockchains',
@@ -126,6 +127,48 @@ export const preflightCircleConfig = (
       message: `Confirm this Google Web client ID is enabled under Authentication Methods → Social Logins in Circle Console (${label}), and register the redirect URI in Google Cloud.`,
       docsUrl: DOCS.google,
     });
+  }
+
+  if (methods.includes('facebook')) {
+    if (!circle.facebook.appId) {
+      issues.push({
+        id: 'facebookAppId',
+        envVar: 'FACEBOOK_APP_ID',
+        scope: 'client',
+        severity: 'error',
+        message: `Facebook app ID is missing. Pass it as \`circle.facebook.appId\`. ${PUBLIC_PREFIX_HINT}`,
+        docsUrl: DOCS.google,
+      });
+    } else {
+      issues.push({
+        id: 'facebookConsoleConfig',
+        scope: 'console',
+        severity: 'warning',
+        message: `Confirm Facebook is enabled under Authentication Methods → Social Logins in Circle Console (${label}), and add the redirect URI to Valid OAuth Redirect URIs in the Meta app.`,
+        docsUrl: DOCS.google,
+      });
+    }
+  }
+
+  if (methods.includes('apple')) {
+    if (!circle.apple?.apiKey || !circle.apple.authDomain) {
+      issues.push({
+        id: 'appleFirebaseConfig',
+        scope: 'client',
+        severity: 'error',
+        message:
+          'Apple sign-in needs a Firebase web app config with at least `apiKey` and `authDomain`. Pass it as `circle.apple`.',
+        docsUrl: DOCS.apple,
+      });
+    } else {
+      issues.push({
+        id: 'appleConsoleConfig',
+        scope: 'console',
+        severity: 'warning',
+        message: `Confirm the Apple provider is enabled in Firebase Authentication, your domain is authorized there, and Apple is enabled under Social Logins in Circle Console (${label}).`,
+        docsUrl: DOCS.apple,
+      });
+    }
   }
 
   if (methods.includes('email')) {

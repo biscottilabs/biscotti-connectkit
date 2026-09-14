@@ -1,7 +1,7 @@
 # Sign in with Circle
 
-Let users create a wallet with Google or an email one-time code instead of a
-browser extension, backed by
+Let users create a wallet with Google, Apple, Facebook or an email one-time code
+instead of a browser extension, backed by
 [Circle user-controlled wallets](https://developers.circle.com/wallets/user-controlled/build-a-wallet-app).
 
 The result is a normal wagmi connector: `useAccount()`, `useSignMessage()`,
@@ -9,8 +9,10 @@ The result is a normal wagmi connector: `useAccount()`, `useSignMessage()`,
 
 - **Opt-in.** Omit the `circle` option and nothing changes: no UI, no bundle cost.
 - **Testnet and mainnet.** Configure both and switch with one value.
-- **Two authentication methods.** Google and email OTP. PIN is shown as
-  *coming soon* when included in `methods`.
+- **Four authentication methods.** Google, Apple, Facebook and email OTP. PIN is
+  shown as *coming soon* when included in `methods`.
+- **Testnet is labelled.** The Circle screens show a *Testnet* badge so nobody
+  mistakes a test wallet for a real one.
 - **A backend is required.** Circle's API key must never reach the browser.
   ConnectKit ships the handler.
 
@@ -35,6 +37,8 @@ and to enable Google and Email authentication there.
 | --- | --- | --- |
 | Circle **App ID** (per environment) | Circle Console → Wallets → User Controlled → Configurator | client |
 | Google **client ID** | Google Cloud → Credentials → OAuth 2.0 Client ID, type *Web application* | client |
+| Facebook **app ID** | Meta for Developers → your app | client |
+| Apple: **Firebase web config** | Firebase console → Project settings → Your apps | client |
 | Circle **API key** (per environment) | Circle Console → API Keys | **server only** |
 
 Google setup:
@@ -43,6 +47,19 @@ Google setup:
   and enter the Web client ID.
 - In Google Cloud, add your origin (e.g. `http://localhost:3000`) to the OAuth
   client's **Authorized redirect URIs**.
+
+Facebook setup:
+
+- Enable Facebook under Authentication Methods → Social Logins in Circle Console
+  and enter the app ID and secret.
+- In the Meta app, add your origin to **Valid OAuth Redirect URIs**.
+
+Apple setup (Circle signs in with Apple through Firebase):
+
+- In Firebase Authentication, enable the Apple provider and add your domain to
+  **Authorized domains**.
+- Enable Apple under Social Logins in Circle Console.
+- Pass the Firebase web config as `circle.apple`.
 
 Email setup:
 
@@ -125,11 +142,13 @@ If `environments` declares both, `environment` is required.
 | `environments` | | | `{ testnet, mainnet }` overrides. |
 | `appId` | yes | | Circle App ID. |
 | `google` | yes | | `clientId`, `redirectUri` (defaults to `window.location.origin`), `selectAccountPrompt`. |
+| `facebook` | yes | | `appId`, `redirectUri` (defaults to `window.location.origin`). |
+| `apple` | yes | | Firebase web config: `apiKey`, `authDomain`, `projectId`, `appId`. |
 | `defaultChainId` | yes | first app chain in the environment | Must be in your wagmi `chains`. |
 | `accountType` | yes | `EOA` | `SCA` for Gas Station sponsorship. Avoid on Ethereum mainnet. |
 | `endpoints.basePath` | yes | `/api/circle` | Where the backend handler is mounted. |
 | `adapter` | yes | | Replace the HTTP client. |
-| `methods` | | `['google', 'email']` | |
+| `methods` | | `['google', 'email']` | Any of `google`, `apple`, `facebook`, `email`, in display order. |
 | `feeLevel` | | `MEDIUM` | Circle ignores explicit gas. |
 | `chains` | | | Add or override Circle chain identifiers. |
 | `name` | | `Sign in with Circle` | Wallet list label. |
@@ -208,7 +227,7 @@ The handler:
 
 | Route | Circle endpoint |
 | --- | --- |
-| `POST /device-token` | `POST /users/social/token` |
+| `POST /device-token` | `POST /users/social/token` (Google, Facebook, Apple) |
 | `POST /email-otp` | `POST /users/email/token` |
 | `POST /initialize-user` | `POST /user/initialize` |
 | `POST /create-wallet` | `POST /user/wallets` |
@@ -246,7 +265,9 @@ never values.
 ## How it works
 
 ```
-Choose Google -> /device-token -> performLogin(GOOGLE) -> OAuth redirect
+Choose Google/Facebook -> /device-token -> performLogin() -> OAuth redirect
+                                                        |
+Choose Apple  -> /device-token (fetched early) -> performLogin(APPLE) -> popup
                                                         |
 Choose Email  -> /email-otp   -> verifyOtp() -> hosted OTP window
                                                         |
@@ -288,6 +309,9 @@ These come from Circle's model:
   environment always fails; that is a different Circle user.
 - **Inactive users re-authenticate**: a token not refreshed within 14 days
   expires.
+- **Apple uses a popup**: ConnectKit fetches the device token before the click so
+  the popup is not blocked. If the user closes the popup, Circle reports nothing,
+  so the screen offers a cancel button.
 - **Generic `EVM` / `EVM-TESTNET` chains** support signing only; Circle does not
   broadcast on them.
 
@@ -299,8 +323,18 @@ Chain mappings live in
 ```tsx
 import { useCircleLogin } from '@biscottidex/connectkit';
 
-const { status, environment, issues, signInWithGoogle, signInWithEmail, signOut, address } =
-  useCircleLogin();
+const {
+  status,
+  environment,
+  issues,
+  signInWithGoogle,
+  signInWithApple,
+  signInWithFacebook,
+  signInWithEmail,
+  cancelSignIn,
+  signOut,
+  address,
+} = useCircleLogin();
 
 await signInWithEmail('user@example.com');
 ```

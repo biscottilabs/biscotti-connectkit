@@ -9,7 +9,9 @@ import type {
   CircleAppearance,
   CircleBackendAdapter,
   CircleEndpointConfig,
+  CircleAppleOptions,
   CircleEvents,
+  CircleFacebookOptions,
   CircleFeeLevel,
   CircleGoogleOptions,
   CircleLoginMethod,
@@ -30,6 +32,8 @@ export type ResolvedCircleConfig = {
   usesEnvironments: boolean;
   appId?: string;
   google: CircleGoogleOptions;
+  facebook: CircleFacebookOptions;
+  apple?: CircleAppleOptions;
   methods: CircleLoginMethod[];
   endpoints?: CircleEndpointConfig;
   adapter?: CircleBackendAdapter;
@@ -97,6 +101,8 @@ export const resolveCircleConfig = (
     usesEnvironments: circle.environments !== undefined,
     appId: scoped.appId ?? circle.appId,
     google: { ...circle.google, ...scoped.google },
+    facebook: { ...circle.facebook, ...scoped.facebook },
+    apple: scoped.apple ?? circle.apple,
     methods: circle.methods ?? CIRCLE_DEFAULT_METHODS,
     endpoints: scoped.endpoints ?? circle.endpoints,
     adapter: scoped.adapter ?? circle.adapter,

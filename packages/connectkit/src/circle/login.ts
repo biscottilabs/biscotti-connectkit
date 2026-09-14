@@ -1,11 +1,14 @@
 import type {
   Configs,
   EmailLoginResult,
+  SocialLoginResult,
 } from '@circle-fin/w3s-pw-web-sdk/dist/src/types';
 
 import type {
   CircleBackendAdapter,
   CircleChallengeResponse,
+  CircleDeviceTokenResult,
+  CircleSocialProvider,
   CircleWallet,
 } from './types';
 import { CircleBackendError } from './backend';
@@ -37,37 +40,198 @@ export const sessionScope = (
   storage: circle.storage,
 });
 
-const resolveRedirectUri = (circle: ResolvedCircleConfig): string =>
-  circle.google.redirectUri ??
-  (typeof window !== 'undefined' ? window.location.origin : '');
+const origin = () =>
+  typeof window !== 'undefined' ? window.location.origin : '';
+
+const PROVIDER_LABEL: Record<CircleSocialProvider, string> = {
+  google: 'Google',
+  facebook: 'Facebook',
+  apple: 'Apple',
+};
 
 /**
- * The SDK must be configured with the *same* device token on both sides of the
- * OAuth redirect, so this is built from stored values on resume rather than
- * from a fresh token.
+ * The SDK must see the same device token on both sides of a redirect, so on
+ * resume this is built from the stored values rather than a fresh token.
  */
-const buildConfigs = (
+const socialLoginConfigs = (
   circle: ResolvedCircleConfig,
-  deviceToken: string,
-  deviceEncryptionKey: string
-): Configs => ({
-  appSettings: { appId: circle.appId ?? '' },
-  loginConfigs: {
+  provider: CircleSocialProvider,
+  { deviceToken, deviceEncryptionKey }: CircleDeviceTokenResult
+): Configs => {
+  const loginConfigs: NonNullable<Configs['loginConfigs']> = {
     deviceToken,
     deviceEncryptionKey,
-    google: {
+  };
+
+  if (provider === 'google') {
+    loginConfigs.google = {
       clientId: circle.google.clientId ?? '',
-      redirectUri: resolveRedirectUri(circle),
+      redirectUri: circle.google.redirectUri ?? origin(),
       selectAccountPrompt: circle.google.selectAccountPrompt ?? true,
-    },
-  },
-});
+    };
+  } else if (provider === 'facebook') {
+    loginConfigs.facebook = {
+      appId: circle.facebook.appId ?? '',
+      redirectUri: circle.facebook.redirectUri ?? origin(),
+    };
+  } else {
+    loginConfigs.apple = circle.apple;
+  }
+
+  return { appSettings: { appId: circle.appId ?? '' }, loginConfigs };
+};
+
+type LoginError = { code?: number; message: string } | undefined;
+
+/** Turns the SDK's login callback into a session, or a readable error. */
+const settleLogin = (
+  label: string,
+  chainId: number,
+  resolve: (session: CircleSession) => void,
+  reject: (error: Error) => void
+) => (error: LoginError, result: SocialLoginResult | EmailLoginResult | undefined) => {
+  if (error) {
+    reject(
+      new Error(
+        `${label} sign-in failed${
+          error.code !== undefined ? ` (code ${error.code})` : ''
+        }: ${error.message}`
+      )
+    );
+    return;
+  }
+
+  if (!result?.userToken || !result.encryptionKey) {
+    reject(new Error(`${label} sign-in returned an incomplete result.`));
+    return;
+  }
+
+  resolve({
+    userToken: result.userToken,
+    encryptionKey: result.encryptionKey,
+    refreshToken: result.refreshToken,
+    email:
+      'oAuthInfo' in result
+        ? result.oAuthInfo?.socialUserInfo?.email
+        : undefined,
+    chainId,
+    createdAt: Date.now(),
+  });
+};
+
+const requestDeviceToken = async (
+  circle: ResolvedCircleConfig,
+  adapter: CircleBackendAdapter
+): Promise<CircleDeviceTokenResult> => {
+  const sdk = await getCircleSdkFor(circle);
+  return adapter.createDeviceToken({ deviceId: await sdk.getDeviceId() });
+};
 
 /**
- * Circle's current docs require an `email` object inside `loginConfigs`.
- * Version 1.1.11 accepts it at runtime, although its published LoginConfigs
- * declaration does not include the field yet.
+ * Starts Google or Facebook sign-in. The browser navigates away; control
+ * resumes in {@link resumeSocialLogin} after the redirect.
  */
+export const beginRedirectLogin = async ({
+  circle,
+  adapter,
+  chainId,
+  provider,
+}: CircleLoginContext & { provider: 'google' | 'facebook' }): Promise<void> => {
+  const { SocialLoginProvider } = await loadCircleSdk();
+  const sdk = await getCircleSdkFor(circle);
+  const tokens = await requestDeviceToken(circle, adapter);
+
+  // Saved before navigating: once `performLogin` runs, this page is gone.
+  savePendingLogin(sessionScope(circle), { ...tokens, chainId, provider });
+
+  sdk.updateConfigs(socialLoginConfigs(circle, provider, tokens));
+
+  await sdk.performLogin(
+    (provider === 'google'
+      ? SocialLoginProvider.GOOGLE
+      : SocialLoginProvider.FACEBOOK) as never
+  );
+};
+
+export const beginGoogleLogin = (context: CircleLoginContext) =>
+  beginRedirectLogin({ ...context, provider: 'google' });
+
+export const beginFacebookLogin = (context: CircleLoginContext) =>
+  beginRedirectLogin({ ...context, provider: 'facebook' });
+
+// Apple opens a popup, which browsers block if it follows a slow network call.
+const APPLE_TOKEN_REUSE_MS = 5 * 60 * 1000;
+
+const preparedAppleTokens = new Map<
+  string,
+  { promise: Promise<CircleDeviceTokenResult>; createdAt: number }
+>();
+
+const appleKey = (circle: ResolvedCircleConfig) =>
+  `${circle.environment}:${circle.appId ?? ''}`;
+
+/** Fetches the device token before the user clicks, so the popup opens at once. */
+export const prepareAppleLogin = ({
+  circle,
+  adapter,
+}: Pick<CircleLoginContext, 'circle' | 'adapter'>) => {
+  const key = appleKey(circle);
+  const existing = preparedAppleTokens.get(key);
+  if (existing && Date.now() - existing.createdAt < APPLE_TOKEN_REUSE_MS) return;
+
+  const promise = requestDeviceToken(circle, adapter);
+  promise.catch(() => preparedAppleTokens.delete(key));
+  preparedAppleTokens.set(key, { promise, createdAt: Date.now() });
+};
+
+/**
+ * Signs in with Apple in a popup and returns the session. Resolves only when
+ * Circle reports a result; if the user closes the popup nothing is reported,
+ * so offer a way to cancel.
+ */
+export const beginAppleLogin = async ({
+  circle,
+  adapter,
+  chainId,
+}: CircleLoginContext): Promise<CircleSession> => {
+  if (!circle.apple) {
+    throw new Error(
+      'Apple sign-in needs `circle.apple` set to your Firebase web app config.'
+    );
+  }
+
+  const key = appleKey(circle);
+  const prepared = preparedAppleTokens.get(key);
+  preparedAppleTokens.delete(key);
+
+  const tokens =
+    (prepared && Date.now() - prepared.createdAt < APPLE_TOKEN_REUSE_MS
+      ? await prepared.promise.catch(() => null)
+      : null) ?? (await requestDeviceToken(circle, adapter));
+
+  const { SocialLoginProvider } = await loadCircleSdk();
+
+  const session = await new Promise<CircleSession>((resolve, reject) => {
+    getCircleSdkFor(
+      circle,
+      socialLoginConfigs(circle, 'apple', tokens),
+      settleLogin('Apple', chainId, resolve, reject)
+    )
+      .then((sdk) => sdk.performLogin(SocialLoginProvider.APPLE as never))
+      .catch(reject);
+  });
+
+  saveSession(sessionScope(circle), session);
+  emitCircleEvent(() =>
+    circle.events.onLogin?.({
+      environment: circle.environment,
+      method: 'apple',
+      email: session.email,
+    })
+  );
+  return session;
+};
+
 const buildEmailConfigs = (
   circle: ResolvedCircleConfig,
   email: string,
@@ -84,35 +248,6 @@ const buildEmailConfigs = (
       email: { email },
     },
   } as Configs);
-
-/**
- * Starts Google sign-in. This navigates the browser away and does not return;
- * control resumes in {@link resumeGoogleLogin} after Google redirects back.
- */
-export const beginGoogleLogin = async ({
-  circle,
-  adapter,
-  chainId,
-}: CircleLoginContext): Promise<void> => {
-  const { SocialLoginProvider } = await loadCircleSdk();
-  const sdk = await getCircleSdkFor(circle);
-
-  const deviceId = await sdk.getDeviceId();
-  const { deviceToken, deviceEncryptionKey } = await adapter.createDeviceToken({
-    deviceId,
-  });
-
-  // Persist before navigating: once `performLogin` fires, this page is gone.
-  savePendingLogin(sessionScope(circle), {
-    deviceToken,
-    deviceEncryptionKey,
-    chainId,
-  });
-
-  sdk.updateConfigs(buildConfigs(circle, deviceToken, deviceEncryptionKey));
-
-  await sdk.performLogin(SocialLoginProvider.GOOGLE as never);
-};
 
 /**
  * Sends an email OTP and opens Circle's hosted verification UI.
@@ -146,35 +281,8 @@ export const beginEmailLogin = async ({
   );
 
   const session = await new Promise<CircleSession>((resolve, reject) => {
-    const onLoginComplete = (
-      error: { code?: number; message: string } | undefined,
-      result: EmailLoginResult | undefined
-    ) => {
-      if (error) {
-        reject(
-          new Error(
-            `Email verification failed${
-              error.code !== undefined ? ` (code ${error.code})` : ''
-            }: ${error.message}`
-          )
-        );
-        return;
-      }
-
-      if (!result?.userToken || !result.encryptionKey) {
-        reject(new Error('Email verification returned an incomplete result.'));
-        return;
-      }
-
-      resolve({
-        userToken: result.userToken,
-        encryptionKey: result.encryptionKey,
-        refreshToken: result.refreshToken,
-        email,
-        chainId,
-        createdAt: Date.now(),
-      });
-    };
+    const onLoginComplete = settleLogin('Email', chainId, (value) =>
+      resolve({ ...value, email }), reject);
 
     getCircleSdkFor(circle, configs, onLoginComplete)
       .then((configuredSdk) => configuredSdk.verifyOtp())
@@ -209,7 +317,7 @@ export const looksLikeOAuthReturn = (): boolean => {
  * Requiring both the SDK callback values and our pending record prevents an
  * unrelated OAuth callback elsewhere in the host app from opening ConnectKit.
  */
-export const shouldResumeGoogleLogin = (circle: ResolvedCircleConfig): boolean =>
+export const shouldResumeSocialLogin = (circle: ResolvedCircleConfig): boolean =>
   readPendingLogin(sessionScope(circle)) !== null && looksLikeOAuthReturn();
 
 const clearOAuthReturnFromAddressBar = () => {
@@ -236,67 +344,41 @@ const clearOAuthReturnFromAddressBar = () => {
 const LOGIN_CALLBACK_TIMEOUT_MS = 45_000;
 
 /**
- * Completes a login that was started before an OAuth redirect.
- *
- * Returns `null` when there is nothing to resume, so it is safe to call on
- * every mount.
+ * Completes a Google or Facebook login started before the redirect. Returns
+ * `null` when there is nothing to resume, so it is safe to call on every mount.
  */
-export const resumeGoogleLogin = async (
+export const resumeSocialLogin = async (
   circle: ResolvedCircleConfig
 ): Promise<CircleSession | null> => {
   const scope = sessionScope(circle);
   const pending = readPendingLogin(scope);
   if (!pending || !looksLikeOAuthReturn()) return null;
 
-  const configs = buildConfigs(
-    circle,
-    pending.deviceToken,
-    pending.deviceEncryptionKey
-  );
+  const provider = pending.provider ?? 'google';
+  const label = PROVIDER_LABEL[provider];
 
   const result = await new Promise<CircleSession>((resolve, reject) => {
     const timer = setTimeout(() => {
       clearPendingLogin(scope);
       reject(
         new Error(
-          'Timed out waiting for Google to complete sign-in. Check that your redirect URI is registered in both Google Cloud and the Circle console.'
+          `Timed out waiting for ${label} to complete sign-in. Check that your redirect URI is registered with ${label} and in Circle Console.`
         )
       );
     }, LOGIN_CALLBACK_TIMEOUT_MS);
 
-    getCircleSdkFor(circle, configs, (error, loginResult) => {
-      clearTimeout(timer);
-      clearPendingLogin(scope);
-      clearOAuthReturnFromAddressBar();
+    const settle = settleLogin(label, pending.chainId, resolve, reject);
 
-      if (error) {
-        reject(
-          new Error(
-            `Google sign-in failed${
-              error.code !== undefined ? ` (code ${error.code})` : ''
-            }: ${error.message}`
-          )
-        );
-        return;
+    getCircleSdkFor(
+      circle,
+      socialLoginConfigs(circle, provider, pending),
+      (error, loginResult) => {
+        clearTimeout(timer);
+        clearPendingLogin(scope);
+        clearOAuthReturnFromAddressBar();
+        settle(error, loginResult);
       }
-
-      if (!loginResult?.userToken || !loginResult?.encryptionKey) {
-        reject(new Error('Google sign-in returned an incomplete result.'));
-        return;
-      }
-
-      resolve({
-        userToken: loginResult.userToken,
-        encryptionKey: loginResult.encryptionKey,
-        refreshToken: loginResult.refreshToken,
-        email:
-          'oAuthInfo' in loginResult
-            ? loginResult.oAuthInfo?.socialUserInfo?.email
-            : undefined,
-        chainId: pending.chainId,
-        createdAt: Date.now(),
-      });
-    }).catch((sdkError) => {
+    ).catch((sdkError) => {
       clearTimeout(timer);
       reject(sdkError);
     });
@@ -306,7 +388,7 @@ export const resumeGoogleLogin = async (
   emitCircleEvent(() =>
     circle.events.onLogin?.({
       environment: circle.environment,
-      method: 'google',
+      method: provider,
       email: result.email,
     })
   );

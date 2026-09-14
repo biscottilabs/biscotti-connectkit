@@ -30,7 +30,7 @@ import { Web3ContextProvider } from './contexts/web3';
 import { useChainIsSupported } from '../hooks/useChainIsSupported';
 import type { CircleOptions } from '../circle';
 import { isCircleEnabled } from '../circle/types';
-import { shouldResumeGoogleLogin } from '../circle/login';
+import { shouldResumeSocialLogin } from '../circle/login';
 import { resolveCircleConfig } from '../circle/config';
 import { CIRCLE_CONNECTOR_ID } from '../circle/connector';
 
@@ -220,7 +220,7 @@ export const ConnectKitProvider = ({
       circleOptions!,
       wagmiConfig.chains.map((chain) => chain.id)
     );
-    if (!shouldResumeGoogleLogin(circle)) return;
+    if (!shouldResumeSocialLogin(circle)) return;
     setRoute(routes.CIRCLE);
     setOpen(true);
   }, []);

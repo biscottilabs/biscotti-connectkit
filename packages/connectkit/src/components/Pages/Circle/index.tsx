@@ -15,6 +15,7 @@ import { Spinner } from '../../Common/Spinner';
 import {
   Container,
   BackButton,
+  EnvironmentBadge,
   EmailForm,
   EmailInput,
   EmailLabel,
@@ -34,7 +35,14 @@ import {
   MethodList,
 } from './styles';
 
-import { CircleLogo, GoogleLogo, MailIcon, PinIcon } from '../../../assets/circle';
+import {
+  AppleLogo,
+  CircleLogo,
+  FacebookLogo,
+  GoogleLogo,
+  MailIcon,
+  PinIcon,
+} from '../../../assets/circle';
 import { useCircleLogin } from '../../../circle/useCircleLogin';
 import { CIRCLE_CONNECTOR_ID } from '../../../circle/connector';
 import type { CircleConfigScope } from '../../../circle/types';
@@ -43,7 +51,6 @@ import { hasBlockingIssues } from '../../../circle/preflight';
 import { useContext as useConnectKitContext } from '../../ConnectKit';
 
 const CircleSignIn: React.FC = () => {
-  const locales = useLocales({});
   const { triggerResize } = useConnectKitContext();
   const { connect } = useConnect();
   const connectors = useConnectors();
@@ -54,15 +61,32 @@ const CircleSignIn: React.FC = () => {
 
   const {
     status,
+    environment,
     issues,
     canShowDiagnostics,
     error,
     activeMethod,
     signInWithGoogle,
+    signInWithFacebook,
+    signInWithApple,
     signInWithEmail,
     cancelSignIn,
     address,
   } = useCircleLogin();
+  const locales = useLocales({
+    PROVIDER: activeMethod === 'facebook' ? 'Facebook' : 'Google',
+  });
+
+  // Testnet wallets hold no real value; say so wherever Circle is branded.
+  const footnote = (
+    <Footnote>
+      <CircleLogo width={14} height={14} />
+      {locales.circleScreen_securedByCircle}
+      {environment === 'testnet' && (
+        <EnvironmentBadge>{locales.circleScreen_testnet}</EnvironmentBadge>
+      )}
+    </Footnote>
+  );
 
   // Circle changes between several views without changing the ConnectKit route.
   // Ask the modal to remeasure after those views render so a short loading
@@ -167,9 +191,11 @@ const CircleSignIn: React.FC = () => {
           <ModalBody>
             {activeMethod === 'email'
               ? locales.circleScreen_email_verifying
+              : activeMethod === 'apple'
+              ? locales.circleScreen_apple_waiting
               : locales.circleScreen_redirecting}
           </ModalBody>
-          {activeMethod === 'email' && (
+          {(activeMethod === 'email' || activeMethod === 'apple') && (
             <BackButton
               type="button"
               onClick={() => {
@@ -203,6 +229,7 @@ const CircleSignIn: React.FC = () => {
         <ModalContent style={{ gap: 8 }}>
           <ModalH1 $small>{locales.circleScreen_connected}</ModalH1>
           <ModalBody>{address}</ModalBody>
+          {footnote}
         </ModalContent>
       </PageContent>
     );
@@ -256,10 +283,7 @@ const CircleSignIn: React.FC = () => {
 
           {errorMessage}
 
-          <Footnote>
-            <CircleLogo width={14} height={14} />
-            {locales.circleScreen_securedByCircle}
-          </Footnote>
+          {footnote}
         </Container>
       </PageContent>
     );
@@ -281,6 +305,26 @@ const CircleSignIn: React.FC = () => {
               </MethodIcon>
               <MethodLabel>
                 {locales.circleScreen_continueWithGoogle}
+              </MethodLabel>
+            </MethodButton>
+          )}
+
+          {methods.includes('apple') && (
+            <MethodButton type="button" onClick={() => signInWithApple()}>
+              <MethodIcon>
+                <AppleLogo />
+              </MethodIcon>
+              <MethodLabel>{locales.circleScreen_continueWithApple}</MethodLabel>
+            </MethodButton>
+          )}
+
+          {methods.includes('facebook') && (
+            <MethodButton type="button" onClick={() => signInWithFacebook()}>
+              <MethodIcon>
+                <FacebookLogo />
+              </MethodIcon>
+              <MethodLabel>
+                {locales.circleScreen_continueWithFacebook}
               </MethodLabel>
             </MethodButton>
           )}
@@ -314,10 +358,7 @@ const CircleSignIn: React.FC = () => {
 
         {errorMessage}
 
-        <Footnote>
-          <CircleLogo width={14} height={14} />
-          {locales.circleScreen_securedByCircle}
-        </Footnote>
+        {footnote}
       </Container>
     </PageContent>
   );

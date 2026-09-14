@@ -6,6 +6,9 @@ export type {
   CircleFeeLevel,
   CircleEnvironmentHealth,
   CircleAppearance,
+  CircleAppleOptions,
+  CircleFacebookOptions,
+  CircleSocialProvider,
   CircleStorage,
   CircleStorageOption,
   CircleEvents,
@@ -73,9 +76,14 @@ export {
 export type { CircleSdk, CircleChallengeResult } from './sdk';
 
 export {
+  beginAppleLogin,
   beginEmailLogin,
+  beginFacebookLogin,
   beginGoogleLogin,
-  resumeGoogleLogin,
+  beginRedirectLogin,
+  prepareAppleLogin,
+  resumeSocialLogin,
+  shouldResumeSocialLogin,
   ensureWallet,
   looksLikeOAuthReturn,
   refreshSessionIfStale,

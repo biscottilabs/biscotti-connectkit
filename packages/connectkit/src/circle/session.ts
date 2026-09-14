@@ -23,6 +23,8 @@ export type CircleSessionScope = {
 
 /** Saved before the Google redirect, which discards all in-memory state. */
 export type CirclePendingLogin = {
+  /** Absent in records written before Facebook support. */
+  provider?: 'google' | 'facebook';
   deviceToken: string;
   deviceEncryptionKey: string;
   chainId: number;

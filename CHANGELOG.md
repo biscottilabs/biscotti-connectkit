@@ -17,6 +17,11 @@
   method, `refresh-token` route).
 - `circle.storage` (`session`, `local`, or custom), `circle.appearance` for Circle's hosted
   screens, and `onLogin`, `onWallet`, `onSignOut`, `onError` callbacks.
+- Apple and Facebook sign-in (`circle.apple`, `circle.facebook`, `signInWithApple`,
+  `signInWithFacebook`). Apple's device token is fetched ahead of the click so its popup
+  is not blocked.
+- A *Testnet* badge on the Circle screens when running against testnet.
+- Test suite for the Circle integration (`bun run test`), run in CI.
 - Preflight errors for an invalid or ambiguous environment, a default chain from the
   other environment, and a default chain missing from the wagmi `chains`.
 
@@ -26,6 +31,8 @@
   single chain id.
 - `readCircleSession` takes a `{ environment, appId, storage }` scope.
   `clearCircleSession({ environment?, storage? })` with no environment clears both.
+- `resumeGoogleLogin` and `shouldResumeGoogleLogin` are now `resumeSocialLogin` and
+  `shouldResumeSocialLogin`, covering Facebook too.
 - Diagnostics name variables without a framework prefix, e.g. `CIRCLE_TESTNET_APP_ID`
   instead of `NEXT_PUBLIC_CIRCLE_TESTNET_APP_ID`.
 

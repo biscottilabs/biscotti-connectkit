@@ -6,11 +6,13 @@ import { resolveBackendAdapter } from './backend';
 import type { CircleEnvironment } from './chains';
 import { emitCircleEvent } from './config';
 import {
+  beginAppleLogin,
   beginEmailLogin,
-  beginGoogleLogin,
+  beginRedirectLogin,
   ensureWallet,
+  prepareAppleLogin,
   refreshSessionIfStale,
-  resumeGoogleLogin,
+  resumeSocialLogin,
   sessionScope,
 } from './login';
 import {
@@ -21,7 +23,12 @@ import {
 } from './preflight';
 import { clearSession, readSession, type CircleSession } from './session';
 import { resetCircleSdk } from './sdk';
-import { isCircleEnabled, type CircleConfigIssue, type CircleWallet } from './types';
+import {
+  isCircleEnabled,
+  type CircleConfigIssue,
+  type CircleLoginMethod,
+  type CircleWallet,
+} from './types';
 import { useCircleConfig, useCircleOptions } from './useCircleOptions';
 
 const CIRCLE_HEALTH_TIMEOUT_MS = 2_500;
@@ -52,7 +59,7 @@ export type CircleLoginStatus =
   /** Configuration is incomplete; `issues` says what is missing. */
   | 'unconfigured'
   | 'ready'
-  /** Redirecting to Google or waiting for Circle's hosted email OTP UI. */
+  /** Redirecting to Google or Facebook, or waiting for Apple's popup or the email OTP UI. */
   | 'authenticating'
   /**
    * Circle's hosted wallet-setup challenge is open.
@@ -74,10 +81,12 @@ export type UseCircleLoginResult = {
   wallet: CircleWallet | null;
   address?: string;
   error: Error | null;
-  activeMethod: 'google' | 'email' | null;
+  activeMethod: Exclude<CircleLoginMethod, 'pin'> | null;
   /** Backwards-compatible shorthand for Google authentication. */
   signIn: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
+  signInWithFacebook: () => Promise<void>;
+  signInWithApple: () => Promise<void>;
   signInWithEmail: (email: string) => Promise<void>;
   cancelSignIn: () => void;
   signOut: () => void;
@@ -104,9 +113,8 @@ export const useCircleLogin = (): UseCircleLoginResult => {
   const [session, setSession] = useState<CircleSession | null>(null);
   const [wallet, setWallet] = useState<CircleWallet | null>(null);
   const [error, setError] = useState<Error | null>(null);
-  const [activeMethod, setActiveMethod] = useState<
-    'google' | 'email' | null
-  >(null);
+  const [activeMethod, setActiveMethod] =
+    useState<UseCircleLoginResult['activeMethod']>(null);
 
   const authAttemptRef = useRef(0);
 
@@ -196,7 +204,7 @@ export const useCircleLogin = (): UseCircleLoginResult => {
       // Restore an in-flight OAuth round trip before falling back to a stored
       // session, so a fresh login always wins over a stale one.
       try {
-        const resumed = await resumeGoogleLogin(circle!);
+        const resumed = await resumeSocialLogin(circle!);
         if (cancelled) return;
 
         if (resumed) {
@@ -265,41 +273,13 @@ export const useCircleLogin = (): UseCircleLoginResult => {
     // one-shot OAuth record. Environment or App ID changes mean a different app.
   }, [enabled, circle?.environment, circle?.appId]);
 
-  const signInWithGoogle = useCallback(async () => {
-    if (!enabled || !circle || !adapter) return;
-
-    setError(null);
-    setActiveMethod('google');
-    authAttemptRef.current += 1;
-
-    const found = await check();
-    if (hasBlockingIssues(found)) {
-      setStatus('unconfigured');
-      return;
-    }
-
-    setStatus('authenticating');
-    try {
-      // Navigates away; execution continues after the redirect in the effect.
-      await beginGoogleLogin({ circle, adapter, chainId });
-    } catch (signInError) {
-      fail(signInError);
-    }
-  }, [adapter, chainId, check, circle, enabled, fail]);
-
-  const signInWithEmail = useCallback(
-    async (email: string) => {
+  const signInWithRedirect = useCallback(
+    async (provider: 'google' | 'facebook') => {
       if (!enabled || !circle || !adapter) return;
 
-      const normalizedEmail = email.trim().toLowerCase();
-      if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-        fail(new Error('Enter a valid email address.'));
-        return;
-      }
-
       setError(null);
-      setActiveMethod('email');
-      const attempt = ++authAttemptRef.current;
+      setActiveMethod(provider);
+      authAttemptRef.current += 1;
 
       const found = await check();
       if (hasBlockingIssues(found)) {
@@ -309,12 +289,56 @@ export const useCircleLogin = (): UseCircleLoginResult => {
 
       setStatus('authenticating');
       try {
-        const authenticated = await beginEmailLogin({
-          circle,
-          adapter,
-          chainId,
-          email: normalizedEmail,
-        });
+        // Navigates away; execution continues after the redirect in the effect.
+        await beginRedirectLogin({ circle, adapter, chainId, provider });
+      } catch (signInError) {
+        fail(signInError);
+      }
+    },
+    [adapter, chainId, check, circle, enabled, fail]
+  );
+
+  const signInWithGoogle = useCallback(
+    () => signInWithRedirect('google'),
+    [signInWithRedirect]
+  );
+
+  const signInWithFacebook = useCallback(
+    () => signInWithRedirect('facebook'),
+    [signInWithRedirect]
+  );
+
+  // Warm the device token so Apple's popup is not blocked on click.
+  useEffect(() => {
+    if (status === 'ready' && circle?.methods.includes('apple') && adapter) {
+      prepareAppleLogin({ circle, adapter });
+    }
+  }, [adapter, circle, status]);
+
+  /** Runs a same-page login, then provisions the wallet. */
+  const signInInPlace = useCallback(
+    async (
+      method: 'email' | 'apple',
+      authenticate: () => Promise<CircleSession>
+    ) => {
+      if (!enabled || !circle || !adapter) return;
+
+      setError(null);
+      setActiveMethod(method);
+      const attempt = ++authAttemptRef.current;
+
+      // Apple skips the async preflight: its popup must open on the click.
+      if (method !== 'apple') {
+        const found = await check();
+        if (hasBlockingIssues(found)) {
+          setStatus('unconfigured');
+          return;
+        }
+      }
+
+      setStatus('authenticating');
+      try {
+        const authenticated = await authenticate();
         if (attempt !== authAttemptRef.current) return;
         setSession(authenticated);
         setStatus('awaitingPin');
@@ -334,6 +358,30 @@ export const useCircleLogin = (): UseCircleLoginResult => {
       }
     },
     [adapter, chainId, check, circle, enabled, fail]
+  );
+
+  const signInWithApple = useCallback(async () => {
+    if (!circle || !adapter) return;
+    await signInInPlace('apple', () =>
+      beginAppleLogin({ circle, adapter, chainId })
+    );
+  }, [adapter, chainId, circle, signInInPlace]);
+
+  const signInWithEmail = useCallback(
+    async (email: string) => {
+      if (!circle || !adapter) return;
+
+      const normalizedEmail = email.trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+        fail(new Error('Enter a valid email address.'));
+        return;
+      }
+
+      await signInInPlace('email', () =>
+        beginEmailLogin({ circle, adapter, chainId, email: normalizedEmail })
+      );
+    },
+    [adapter, chainId, circle, fail, signInInPlace]
   );
 
   const cancelSignIn = useCallback(() => {
@@ -375,6 +423,8 @@ export const useCircleLogin = (): UseCircleLoginResult => {
     activeMethod,
     signIn: signInWithGoogle,
     signInWithGoogle,
+    signInWithFacebook,
+    signInWithApple,
     signInWithEmail,
     cancelSignIn,
     signOut,

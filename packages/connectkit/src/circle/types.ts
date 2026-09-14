@@ -12,7 +12,11 @@ export type CircleLoginMethod = 'google' | 'email' | 'pin' | 'facebook' | 'apple
 export const CIRCLE_IMPLEMENTED_METHODS: CircleLoginMethod[] = [
   'google',
   'email',
+  'facebook',
+  'apple',
 ];
+
+export type CircleSocialProvider = 'google' | 'facebook' | 'apple';
 
 /**
  * `SCA` is an ERC-4337 smart account, required for Gas Station sponsorship. It
@@ -162,7 +166,7 @@ export type CircleStorageOption = 'session' | 'local' | CircleStorage;
 
 export type CircleLoginEvent = {
   environment: CircleEnvironment;
-  method: 'google' | 'email';
+  method: Exclude<CircleLoginMethod, 'pin'>;
   email?: string;
 };
 
@@ -187,6 +191,27 @@ export type CircleGoogleOptions = {
   selectAccountPrompt?: boolean;
 };
 
+export type CircleFacebookOptions = {
+  /** Meta app ID. Public; the app secret goes in Circle Console. */
+  appId?: string;
+  /** Defaults to `window.location.origin`. Must be a valid OAuth redirect URI in Meta. */
+  redirectUri?: string;
+};
+
+/**
+ * Firebase web app config. Circle signs in with Apple through Firebase, so
+ * enable the Apple provider in that Firebase project.
+ */
+export type CircleAppleOptions = {
+  apiKey?: string;
+  authDomain?: string;
+  projectId?: string;
+  appId?: string;
+  storageBucket?: string;
+  messagingSenderId?: string;
+  measurementId?: string;
+};
+
 /**
  * Settings that may differ per environment. Set them at the top level of
  * `CircleOptions` to share them, or under `environments` to override.
@@ -195,6 +220,8 @@ export type CircleEnvironmentOptions = {
   /** Circle Console App ID. Public. */
   appId?: string;
   google?: CircleGoogleOptions;
+  facebook?: CircleFacebookOptions;
+  apple?: CircleAppleOptions;
   /** Must belong to the environment. Defaults to the first app chain in it. */
   defaultChainId?: number;
   /** Defaults to `EOA`. */

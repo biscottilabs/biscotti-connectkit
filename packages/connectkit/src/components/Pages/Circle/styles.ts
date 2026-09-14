@@ -134,6 +134,17 @@ export const Footnote = styled.div`
   color: var(--ck-body-color-muted);
 `;
 
+export const EnvironmentBadge = styled.span`
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ck-body-color-muted);
+  background: var(--ck-body-background-secondary);
+`;
+
 /**
  * Developer diagnostics. Rendered only outside production (or in debugMode), so
  * it favours legibility over polish — a developer needs to see the variable

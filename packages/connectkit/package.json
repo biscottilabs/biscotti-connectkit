@@ -39,7 +39,8 @@
     "start": "rollup --config rollup.config.dev.js -w",
     "dev": "rollup --config rollup.config.dev.js -w",
     "build": "rm -rf build && rollup --config rollup.config.prod.js",
-    "lint": "eslint src --ext .ts,.tsx"
+    "lint": "eslint src --ext .ts,.tsx",
+    "test": "bun test ./test"
   },
   "keywords": [
     "ens",
